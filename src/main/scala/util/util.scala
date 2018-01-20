@@ -1,20 +1,24 @@
 package util
 
-import java.io.InputStream
+import java.io.{File, FileInputStream, InputStream}
 import java.security.{KeyStore, SecureRandom}
 import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
 
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.{ConnectionContext, HttpsConnectionContext}
+import io.circe.Json
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 object HttpsSupport {
-  def context(): HttpsConnectionContext = {
-    val password: Array[Char] = "uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW".toCharArray
+  def context(pass: String, certPath: Option[String] = None): HttpsConnectionContext = {
+    val password: Array[Char] = pass.toCharArray
 
-    val ks: KeyStore          = KeyStore.getInstance("PKCS12")
-    val keystore: InputStream = getClass.getClassLoader.getResourceAsStream("foo.bar.p12")
+    val ks: KeyStore = KeyStore.getInstance("PKCS12")
+    val keystore: InputStream = certPath
+      .map(c => new FileInputStream(new File(c)))
+      .getOrElse(getClass.getClassLoader.getResourceAsStream("foo.bar.p12"))
 
     require(keystore != null, "Keystore required!")
     ks.load(keystore, password)
@@ -56,4 +60,34 @@ object Retry {
     retryPromise[T](times, promise, None, f)
     promise.future
   }
+}
+
+object HttpResponses {
+
+  def NotFound(path: String) = HttpResponse(
+    404,
+    entity =
+      HttpEntity(ContentTypes.`application/json`, Json.obj("error" -> Json.fromString(s"$path not found")).noSpaces)
+  )
+
+  def GatewayTimeout() = HttpResponse(
+    504,
+    entity = HttpEntity(ContentTypes.`application/json`,
+                        Json.obj("error" -> Json.fromString(s"Target servers timeout")).noSpaces)
+  )
+
+  def BadGateway(message: String) = HttpResponse(
+    502,
+    entity = HttpEntity(ContentTypes.`application/json`, Json.obj("error" -> Json.fromString(message)).noSpaces)
+  )
+
+  def BadRequest(message: String) = HttpResponse(
+    400,
+    entity = HttpEntity(ContentTypes.`application/json`, Json.obj("error" -> Json.fromString(message)).noSpaces)
+  )
+
+  def Ok(json: Json) = HttpResponse(
+    200,
+    entity = HttpEntity(ContentTypes.`application/json`, json.noSpaces)
+  )
 }

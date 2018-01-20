@@ -35,8 +35,6 @@ mainClass in assembly := Some("Main")
 assemblyJarName in assembly := "proxy.jar"
 test in assembly := {}
 
-resolvers += "bintray" at "http://jcenter.bintray.com"
-
 scalacOptions ++= Seq(
   "-feature",
   "-language:higherKinds",

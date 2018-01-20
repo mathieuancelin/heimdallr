@@ -1,5 +1,7 @@
 # reverse-proxy
 
+Experimentatl project about http reverse proxies. Trying new things ...
+
 ## Features
 
 - [ ] based on devoxx talk
@@ -35,10 +37,12 @@ curl2 -k -v -H 'Host: test.foo.bar' https://127.0.0.1:8443 --include
 ```
 
 ```sh
+wrk -t1 -c1 -d20s -H "Host: test.foo.bar" http://127.0.0.1:8080/ >> /dev/null
 wrk -t2 -c200 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8080/
 ```
 
 ```sh
+docker kill $(docker ps -q)
 docker run -d -p "8081:80" emilevauge/whoami
 docker run -d -p "8082:80" emilevauge/whoami
 docker run -d -p "8083:80" emilevauge/whoami

@@ -1,8 +1,13 @@
 package models
 
+import java.util.concurrent.TimeUnit
+
 import akka.http.scaladsl.model.{HttpProtocol, HttpProtocols}
-import io.circe.Decoder
+import io.circe.Decoder.Result
+import io.circe._
 import io.circe.generic.semiauto._
+
+import scala.concurrent.duration._
 
 case class Target(scheme: String,
                   host: String,
@@ -37,4 +42,70 @@ case class Command(action: String, domain: String, target: String)
 
 object Command {
   val decoder: Decoder[Command] = deriveDecoder[Command]
+}
+
+case class ClientConfig(retry: Int = 3,
+                        maxFailures: Int = 5,
+                        callTimeout: FiniteDuration = 30.seconds,
+                        resetTimeout: FiniteDuration = 10.seconds)
+
+case class ApiKey(clientId: String, clientSecret: String, name: String, enabled: Boolean)
+
+case class Service(id: String,
+                   domain: String,
+                   targets: Seq[Target],
+                   apiKeys: Seq[ApiKey],
+                   clientConfig: ClientConfig = ClientConfig())
+
+case class HttpConfig(
+    httpPort: Int = 8080,
+    httpsPort: Int = 8443,
+    certPath: Option[String] = None,
+    certPass: String = "uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW"
+)
+case class ApiConfig(
+    httpPort: Int = 9080,
+    httpsPort: Int = 9443,
+    certPath: Option[String] = None,
+    certPass: String = "uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW"
+)
+
+case class ProxyConfig(
+    http: HttpConfig = HttpConfig(),
+    api: ApiConfig = ApiConfig(),
+    services: Map[String, Service] = Map.empty
+) {
+  def pretty: String = Encoders.ProxyConfigEncoder.apply(this).spaces2
+}
+
+object Decoders {
+  implicit val FiniteDurationDecoder: Decoder[FiniteDuration] = new Decoder[FiniteDuration] {
+    override def apply(c: HCursor): Result[FiniteDuration] = c.as[Long].map(v => FiniteDuration(v, TimeUnit.MILLISECONDS))
+  }
+  implicit val HttpProtocolDecoder: Decoder[HttpProtocol] = new Decoder[HttpProtocol] {
+    override def apply(c: HCursor): Result[HttpProtocol] = c.as[String].map(v => HttpProtocol(v))
+  }
+  implicit val TargetDecoder: Decoder[Target] = deriveDecoder[Target]
+  implicit val ClientConfigDecoder: Decoder[ClientConfig] = deriveDecoder[ClientConfig]
+  implicit val ApiKeyDecoder: Decoder[ApiKey] = deriveDecoder[ApiKey]
+  implicit val ServiceDecoder: Decoder[Service] = deriveDecoder[Service]
+  implicit val HttpConfigDecoder: Decoder[HttpConfig] = deriveDecoder[HttpConfig]
+  implicit val ApiConfigDecoder: Decoder[ApiConfig] = deriveDecoder[ApiConfig]
+  implicit val ProxyConfigDecoder: Decoder[ProxyConfig] = deriveDecoder[ProxyConfig]
+}
+
+object Encoders {
+  implicit val FiniteDurationEncoder: Encoder[FiniteDuration] = new Encoder[FiniteDuration] {
+    override def apply(a: FiniteDuration): Json = Json.fromLong(a.toMillis)
+  }
+  implicit val HttpProtocolEncoder: Encoder[HttpProtocol] = new Encoder[HttpProtocol] {
+    override def apply(a: HttpProtocol): Json = Json.fromString(a.value)
+  }
+  implicit val TargetEncoder: Encoder[Target] = deriveEncoder[Target]
+  implicit val ClientConfigEncoder: Encoder[ClientConfig] = deriveEncoder[ClientConfig]
+  implicit val ApiKeyEncoder: Encoder[ApiKey] = deriveEncoder[ApiKey]
+  implicit val ServiceEncoder: Encoder[Service] = deriveEncoder[Service]
+  implicit val HttpConfigEncoder: Encoder[HttpConfig] = deriveEncoder[HttpConfig]
+  implicit val ApiConfigEncoder: Encoder[ApiConfig] = deriveEncoder[ApiConfig]
+  implicit val ProxyConfigEncoder: Encoder[ProxyConfig] = deriveEncoder[ProxyConfig]
 }
