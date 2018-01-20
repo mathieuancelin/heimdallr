@@ -33,9 +33,14 @@ case class ApiKey(clientId: String, clientSecret: String, name: String, enabled:
 
 case class Service(id: String,
                    domain: String,
-                   targets: Seq[Target],
-                   apiKeys: Seq[ApiKey],
-                   clientConfig: ClientConfig = ClientConfig())
+                   targets: Seq[Target] = Seq.empty,
+                   apiKeys: Seq[ApiKey] = Seq.empty,
+                   clientConfig: ClientConfig = ClientConfig(),
+                   headers: Map[String, String] = Map.empty,
+                   targetRoot: Option[String] = None,
+                   root: Option[String] = None,
+                   publicPatterns: Seq[String] = Seq.empty,
+                   privatePatterns: Seq[String] = Seq.empty)
 
 case class HttpConfig(
     httpPort: Int = 8080,

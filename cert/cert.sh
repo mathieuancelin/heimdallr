@@ -107,3 +107,6 @@ openssl pkcs12 \
   -passin env:PW \
   -in foo.bar.p12 \
   -out foo.bar.key
+
+openssl pkcs12 -in foo.bar.p12 -out foo.bar.pem -passin env:PW -passout env:PW
+# openssl pkcs12 -in foo.bar.p12 -out foo.bar.pem -passin pass:uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW -passout pass:uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW

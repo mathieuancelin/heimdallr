@@ -4,18 +4,19 @@ Experimentatl project about http reverse proxies. Trying new things ...
 
 ## Features
 
-- [ ] based on devoxx talk
-- [ ] ProxyConfig object for Api integration
-- [ ] withConfig(ProxyConfig) or withConfigFrom(path)
-- [ ] additional headers
+- [x] ProxyConfig object for Api integration
+- [x] withConfig(ProxyConfig)
+- [ ] withConfigFrom(path)
+- [x] additional headers
 - [ ] admin API complete on another port. Add service to serve this api
 - [ ] metrics JMX or statsd with metrics (maybe statsd integration already provided)
-- [ ] apikeys on the service (no quotas), clientId, clientSecret, enabled, name
-- [ ] api integration + main class 
+- [x] apikeys on the service (no quotas), clientId, clientSecret, enabled, name
+- [ ] pass if public or apikey
+- [x] api integration + main class 
 - [ ] toml for config ?
 - [ ] save state to file periodically
-- [ ] circuit breaker config in service
-- [ ] config for ssl
+- [x] circuit breaker config in service
+- [x] config for ssl
 - [ ] logs like sozu
 - [ ] matching root
 - [ ] input root
