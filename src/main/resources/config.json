@@ -17,23 +17,17 @@
       "domain" : "test.foo.bar",
       "targets" : [
         {
-          "scheme" : "http",
-          "host" : "127.0.0.1",
-          "port" : 8081,
+          "url" : "http://127.0.0.1:8081",
           "weight" : 1,
           "protocol" : "HTTP/1.1"
         },
         {
-          "scheme" : "http",
-          "host" : "127.0.0.1",
-          "port" : 8082,
+          "url" : "http://127.0.0.1:8082",
           "weight" : 1,
           "protocol" : "HTTP/1.1"
         },
         {
-          "scheme" : "http",
-          "host" : "127.0.0.1",
-          "port" : 8083,
+          "url" : "http://127.0.0.1:8083",
           "weight" : 1,
           "protocol" : "HTTP/1.1"
         }

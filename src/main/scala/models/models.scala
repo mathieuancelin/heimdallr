@@ -9,32 +9,12 @@ import io.circe.generic.semiauto._
 
 import scala.concurrent.duration._
 
-case class Target(scheme: String,
-                  host: String,
-                  port: Int,
-                  weight: Int = 1,
-                  protocol: HttpProtocol = HttpProtocols.`HTTP/1.1`) {
-  def url: String = s"$scheme://$host:$port"
-}
-
-object Target {
-  def apply(url: String): Target = {
+case class Target(url: String, weight: Int = 1, protocol: HttpProtocol = HttpProtocols.`HTTP/1.1`) {
+  lazy val (scheme, host, port) = {
     url.split("://|:").toList match {
-      case scheme :: host :: port :: Nil => Target(scheme, host, port.toInt)
+      case scheme :: host :: port :: Nil => (scheme, host, port.toInt)
       case _                             => throw new RuntimeException(s"Bad target: $url")
     }
-  }
-
-  def weighted(url: String, weight: Int): Target = {
-    Target(url).copy(weight = weight)
-  }
-
-  def proto(url: String, protocol: HttpProtocol): Target = {
-    Target(url).copy(protocol = protocol)
-  }
-
-  def protoWeight(url: String, weight: Int, protocol: HttpProtocol): Target = {
-    Target(url).copy(weight = weight, protocol = protocol)
   }
 }
 
@@ -80,18 +60,19 @@ case class ProxyConfig(
 
 object Decoders {
   implicit val FiniteDurationDecoder: Decoder[FiniteDuration] = new Decoder[FiniteDuration] {
-    override def apply(c: HCursor): Result[FiniteDuration] = c.as[Long].map(v => FiniteDuration(v, TimeUnit.MILLISECONDS))
+    override def apply(c: HCursor): Result[FiniteDuration] =
+      c.as[Long].map(v => FiniteDuration(v, TimeUnit.MILLISECONDS))
   }
   implicit val HttpProtocolDecoder: Decoder[HttpProtocol] = new Decoder[HttpProtocol] {
     override def apply(c: HCursor): Result[HttpProtocol] = c.as[String].map(v => HttpProtocol(v))
   }
-  implicit val TargetDecoder: Decoder[Target] = deriveDecoder[Target]
+  implicit val TargetDecoder: Decoder[Target]             = deriveDecoder[Target]
   implicit val ClientConfigDecoder: Decoder[ClientConfig] = deriveDecoder[ClientConfig]
-  implicit val ApiKeyDecoder: Decoder[ApiKey] = deriveDecoder[ApiKey]
-  implicit val ServiceDecoder: Decoder[Service] = deriveDecoder[Service]
-  implicit val HttpConfigDecoder: Decoder[HttpConfig] = deriveDecoder[HttpConfig]
-  implicit val ApiConfigDecoder: Decoder[ApiConfig] = deriveDecoder[ApiConfig]
-  implicit val ProxyConfigDecoder: Decoder[ProxyConfig] = deriveDecoder[ProxyConfig]
+  implicit val ApiKeyDecoder: Decoder[ApiKey]             = deriveDecoder[ApiKey]
+  implicit val ServiceDecoder: Decoder[Service]           = deriveDecoder[Service]
+  implicit val HttpConfigDecoder: Decoder[HttpConfig]     = deriveDecoder[HttpConfig]
+  implicit val ApiConfigDecoder: Decoder[ApiConfig]       = deriveDecoder[ApiConfig]
+  implicit val ProxyConfigDecoder: Decoder[ProxyConfig]   = deriveDecoder[ProxyConfig]
 }
 
 object Encoders {
@@ -101,11 +82,11 @@ object Encoders {
   implicit val HttpProtocolEncoder: Encoder[HttpProtocol] = new Encoder[HttpProtocol] {
     override def apply(a: HttpProtocol): Json = Json.fromString(a.value)
   }
-  implicit val TargetEncoder: Encoder[Target] = deriveEncoder[Target]
+  implicit val TargetEncoder: Encoder[Target]             = deriveEncoder[Target]
   implicit val ClientConfigEncoder: Encoder[ClientConfig] = deriveEncoder[ClientConfig]
-  implicit val ApiKeyEncoder: Encoder[ApiKey] = deriveEncoder[ApiKey]
-  implicit val ServiceEncoder: Encoder[Service] = deriveEncoder[Service]
-  implicit val HttpConfigEncoder: Encoder[HttpConfig] = deriveEncoder[HttpConfig]
-  implicit val ApiConfigEncoder: Encoder[ApiConfig] = deriveEncoder[ApiConfig]
-  implicit val ProxyConfigEncoder: Encoder[ProxyConfig] = deriveEncoder[ProxyConfig]
+  implicit val ApiKeyEncoder: Encoder[ApiKey]             = deriveEncoder[ApiKey]
+  implicit val ServiceEncoder: Encoder[Service]           = deriveEncoder[Service]
+  implicit val HttpConfigEncoder: Encoder[HttpConfig]     = deriveEncoder[HttpConfig]
+  implicit val ApiConfigEncoder: Encoder[ApiConfig]       = deriveEncoder[ApiConfig]
+  implicit val ProxyConfigEncoder: Encoder[ProxyConfig]   = deriveEncoder[ProxyConfig]
 }

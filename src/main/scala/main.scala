@@ -8,14 +8,15 @@ object Main {
           "UjvBYvkrqADUpq1N",
           "test.foo.bar",
           Seq(
-            Target.weighted("http://127.0.0.1:8081", 1),
-            Target.weighted("http://127.0.0.1:8082", 1),
-            Target.weighted("http://127.0.0.1:8083", 1)
+            Target("http://127.0.0.1:8081"),
+            Target("http://127.0.0.1:8082"),
+            Target("http://127.0.0.1:8083")
           ),
           Seq.empty[ApiKey]
         )
       )
     )
+    println(config.pretty)
     new Proxy(config).start()
   }
 }
