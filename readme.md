@@ -15,13 +15,11 @@
 - [ ] circuit breaker config in service
 - [ ] config for ssl
 - [ ] logs like sozu
-
-## TODO
-
 - [ ] matching root
 - [ ] input root
 - [ ] public / private stuff
-- [ ] trouver un nom
+- [ ] find a name for the project
+- [ ] support for WS
 
 ## Helpers
 
@@ -38,4 +36,10 @@ curl2 -k -v -H 'Host: test.foo.bar' https://127.0.0.1:8443 --include
 
 ```sh
 wrk -t2 -c200 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8080/
+```
+
+```sh
+docker run -d -p "8081:80" emilevauge/whoami
+docker run -d -p "8082:80" emilevauge/whoami
+docker run -d -p "8083:80" emilevauge/whoami
 ```

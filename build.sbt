@@ -11,14 +11,18 @@ libraryDependencies ++= {
   lazy val akkaHttpVersion2 = "10.1.0-RC1"
   lazy val akkaVersion      = "2.5.9"
   Seq(
-    "com.typesafe.akka" %% "akka-http"          % akkaHttpVersion2,
-    "com.typesafe.akka" %% "akka-http2-support" % akkaHttpVersion2,
-    "com.typesafe.akka" %% "akka-stream"        % akkaVersion,
-    "com.typesafe.akka" %% "akka-actor"         % akkaVersion,
-    "io.circe"          %% "circe-core"         % "0.9.0",
-    "io.circe"          %% "circe-generic"      % "0.9.0",
-    "io.circe"          %% "circe-parser"       % "0.9.0",
-    "io.circe"          %% "circe-optics"       % "0.9.0"
+    "com.typesafe.akka"     %% "akka-http"          % akkaHttpVersion2,
+    "com.typesafe.akka"     %% "akka-http2-support" % akkaHttpVersion2,
+    "com.typesafe.akka"     %% "akka-stream"        % akkaVersion,
+    "com.typesafe.akka"     %% "akka-actor"         % akkaVersion,
+    "com.typesafe.play"     %% "play-json"          % "2.6.8",
+    "org.gnieh"             %% "diffson-play-json"  % "2.2.3",
+    "ch.qos.logback"        % "logback-classic"     % "1.2.3",
+    "io.dropwizard.metrics" % "metrics-core"        % "4.0.2",
+    "io.circe"              %% "circe-core"         % "0.9.0",
+    "io.circe"              %% "circe-generic"      % "0.9.0",
+    "io.circe"              %% "circe-parser"       % "0.9.0",
+    "io.circe"              %% "circe-optics"       % "0.9.0"
   )
 }
 
@@ -28,7 +32,7 @@ mainClass in Compile := Some("Main")
 mainClass in reStart := Some("Main")
 mainClass in assembly := Some("Main")
 
-assemblyJarName in assembly := "reverseproxy.jar"
+assemblyJarName in assembly := "proxy.jar"
 test in assembly := {}
 
 resolvers += "bintray" at "http://jcenter.bintray.com"
