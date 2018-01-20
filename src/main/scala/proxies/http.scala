@@ -39,7 +39,6 @@ class HttpProxy(config: ProxyConfig, store: Store) {
   }
 
   def handler(request: HttpRequest): Future[HttpResponse] = {
-    logger.info(s"${request.uri}")
     val host = extractHost(request)
     store.get().get(host) match {
       case Some(service) => {
@@ -67,6 +66,7 @@ class HttpProxy(config: ProxyConfig, store: Store) {
               RawHeader("X-Fowarded-Scheme", request.uri.scheme)
             val proxyRequest = request.copy(
               uri = request.uri.copy(
+                path =  Uri.Path(service.targetRoot) ++ request.uri.path,
                 scheme = target.scheme,
                 authority = Authority(host = Uri.NamedHost(target.host), port = target.port)
               ),

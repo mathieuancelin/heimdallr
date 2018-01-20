@@ -37,7 +37,7 @@ case class Service(id: String,
                    apiKeys: Seq[ApiKey] = Seq.empty,
                    clientConfig: ClientConfig = ClientConfig(),
                    headers: Map[String, String] = Map.empty,
-                   targetRoot: Option[String] = None,
+                   targetRoot: String = "",
                    root: Option[String] = None,
                    publicPatterns: Seq[String] = Seq.empty,
                    privatePatterns: Seq[String] = Seq.empty)

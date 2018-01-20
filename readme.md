@@ -19,7 +19,7 @@ Experimentatl project about http reverse proxies. Trying new things ...
 - [x] config for ssl
 - [ ] logs like sozu
 - [ ] matching root
-- [ ] input root
+- [x] target root
 - [ ] public / private stuff
 - [ ] find a name for the project
 - [ ] support for WS
