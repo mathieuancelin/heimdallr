@@ -104,3 +104,5 @@ case class WithApiKey(apiKey: ApiKey) extends WithApiKeyOrNot
 trait CallRestriction
 case object PublicCall  extends CallRestriction
 case object PrivateCall extends CallRestriction
+
+case class ConfigError(message: String)

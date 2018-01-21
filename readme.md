@@ -1,12 +1,12 @@
 # reverse-proxy
 
-Experimentatl project about http reverse proxies. Trying new things ...
+Experimental project to try new things on http reverse proxies. Do not use in production ... yet ;)
 
 ## Features
 
 - [x] ProxyConfig object for Api integration
 - [x] withConfig(ProxyConfig)
-- [ ] withConfigFrom(path)
+- [x] withConfigFrom(path)
 - [x] additional headers
 - [ ] admin API complete on another port. Add service to serve this api
 - [x] metrics JMX or statsd with metrics (maybe statsd integration already provided)
