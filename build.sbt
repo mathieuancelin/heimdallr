@@ -19,7 +19,7 @@ libraryDependencies ++= {
     "org.gnieh"             %% "diffson-play-json"  % "2.2.3",
     "ch.qos.logback"        % "logback-classic"     % "1.2.3",
     "io.dropwizard.metrics" % "metrics-core"        % "4.0.2",
-    "io.dropwizard.metrics" % "metrics-jmx" % "4.0.2",
+    "io.dropwizard.metrics" % "metrics-jmx"         % "4.0.2",
     "io.circe"              %% "circe-core"         % "0.9.0",
     "io.circe"              %% "circe-generic"      % "0.9.0",
     "io.circe"              %% "circe-parser"       % "0.9.0",

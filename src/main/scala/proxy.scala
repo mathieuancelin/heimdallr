@@ -8,8 +8,9 @@ import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import models._
 import proxies.HttpProxy
 import store.Store
+import util.{Startable, Stoppable}
 
-class Proxy(config: ProxyConfig) {
+class Proxy(config: ProxyConfig) extends Startable[Proxy] with Stoppable[Proxy] {
 
   val metrics   = new MetricRegistry()
   val store     = new Store(config.services.groupBy(_.domain), metrics)
@@ -22,27 +23,37 @@ class Proxy(config: ProxyConfig) {
     .convertDurationsTo(TimeUnit.MILLISECONDS)
     .build()
 
-  def start(): Unit = {
+  def start(): Stoppable[Proxy] = {
+    store.start()
     httpProxy.start()
     adminApi.start()
     jmxReporter.start()
+    this
+  }
+
+  override def stop(): Unit = {
+    store.stop()
+    httpProxy.stop()
+    adminApi.stop()
+    jmxReporter.stop()
   }
 }
 
 object Proxy {
   def withConfig(config: ProxyConfig): Proxy = new Proxy(config)
-  def fromConfigPath(path: String): Either[ConfigError, Proxy]    = {
+  def fromConfigPath(path: String): Either[ConfigError, Proxy] = {
     fromConfigFile(new File(path))
   }
-  def fromConfigFile(file: File): Either[ConfigError, Proxy]    = {
-    val conf = ConfigFactory.parseFile(file)
+  def fromConfigFile(file: File): Either[ConfigError, Proxy] = {
+    val conf     = ConfigFactory.parseFile(file)
     val jsonConf = conf.root().render(ConfigRenderOptions.concise())
     io.circe.parser.parse(jsonConf) match {
       case Left(e) => Left(ConfigError(e.message))
-      case Right(json) => Decoders.ProxyConfigDecoder.decodeJson(json) match {
-        case Right(config) => Right(new Proxy(config))
-        case Left(e) => Left(ConfigError(e.message))
-      }
+      case Right(json) =>
+        Decoders.ProxyConfigDecoder.decodeJson(json) match {
+          case Right(config) => Right(new Proxy(config))
+          case Left(e)       => Left(ConfigError(e.message))
+        }
     }
   }
 }

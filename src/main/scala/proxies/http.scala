@@ -17,13 +17,15 @@ import models.{WithApiKeyOrNot, _}
 import org.slf4j.LoggerFactory
 import store.Store
 import util.HttpResponses._
-import util.{HttpsSupport, RegexPool, Retry}
 import util.Implicits._
+import util._
 
 import scala.concurrent.{Future, TimeoutException}
 import scala.util.{Success, Try}
 
-class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry) {
+class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
+    extends Startable[HttpProxy]
+    with Stoppable[HttpProxy] {
 
   implicit val system       = ActorSystem()
   implicit val executor     = system.dispatcher
@@ -93,7 +95,7 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry) {
 
   def handler(request: HttpRequest): Future[HttpResponse] = {
     val start = metrics.timer("proxy-request").time()
-    val host = extractHost(request)
+    val host  = extractHost(request)
     val fu = findService(host, request.uri.path) match {
       case Some(service) => {
         val rawSeq          = service.targets
@@ -135,7 +137,8 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry) {
               val top = System.currentTimeMillis()
               circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).andThen {
                 case Success(resp) =>
-                  logger.info(s"${service.id} ${request.method.value} ${request.uri.scheme}://$host${request.uri.path.toString()} -> ${target.url} ${resp.status.value} ${System.currentTimeMillis() - top} ms.")
+                  logger.info(s"${service.id} ${request.method.value} ${request.uri.scheme}://$host${request.uri.path
+                    .toString()} -> ${target.url} ${resp.status.value} ${System.currentTimeMillis() - top} ms.")
               }
             }
             .recover {
@@ -157,10 +160,16 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry) {
     fu.andThen { case _ => start.close() }
   }
 
-  def start(): Unit = {
+  def start(): Stoppable[HttpProxy] = {
     val httpsContext = HttpsSupport.context(config.http.certPass, config.http.certPath)
     http.bindAndHandleAsync(handler, "0.0.0.0", config.http.httpPort)
     http.bindAndHandleAsync(handler, "0.0.0.0", config.http.httpsPort, connectionContext = httpsContext)
     logger.info(s"Listening on http://0.0.0.0:${config.http.httpPort} and https://0.0.0.0:${config.http.httpsPort}")
+    this
+  }
+
+  def stop(): Unit = {
+    http.shutdownAllConnectionPools()
+    system.terminate()
   }
 }

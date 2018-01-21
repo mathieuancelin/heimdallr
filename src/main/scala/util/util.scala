@@ -135,3 +135,11 @@ object RegexPool {
     pool.get(originalPattern)
   }
 }
+
+trait Startable[A] {
+  def start(): Stoppable[A]
+}
+
+trait Stoppable[A] {
+  def stop(): Unit
+}

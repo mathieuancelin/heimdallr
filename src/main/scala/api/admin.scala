@@ -12,11 +12,13 @@ import models._
 import org.slf4j.LoggerFactory
 import store.Store
 import util.HttpResponses._
-import util.HttpsSupport
+import util.{HttpsSupport, Startable, Stoppable}
 
 import scala.concurrent.Future
 
-class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry) {
+class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
+    extends Startable[AdminApi]
+    with Stoppable[AdminApi] {
 
   implicit val system       = ActorSystem()
   implicit val executor     = system.dispatcher
@@ -58,10 +60,17 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry) {
     }
   }
 
-  def start(): Unit = {
+  def start(): Stoppable[AdminApi] = {
     val httpsContext = HttpsSupport.context(config.api.certPass, config.api.certPath)
     http.bindAndHandleAsync(handler, "0.0.0.0", config.api.httpPort)
     http.bindAndHandleAsync(handler, "0.0.0.0", config.api.httpsPort, connectionContext = httpsContext)
     logger.info(s"Listening on http://0.0.0.0:${config.api.httpPort} and https://0.0.0.0:${config.api.httpsPort}")
+    this
   }
+
+  def stop(): Unit = {
+    http.shutdownAllConnectionPools()
+    system.terminate()
+  }
+
 }
