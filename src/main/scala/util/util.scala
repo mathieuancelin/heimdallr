@@ -2,6 +2,7 @@ package util
 
 import java.io.{File, FileInputStream, InputStream}
 import java.security.{KeyStore, SecureRandom}
+import java.util.Optional
 import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
 
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
@@ -86,8 +87,51 @@ object HttpResponses {
     entity = HttpEntity(ContentTypes.`application/json`, Json.obj("error" -> Json.fromString(message)).noSpaces)
   )
 
+  def Unauthorized(message: String) = HttpResponse(
+    401,
+    entity = HttpEntity(ContentTypes.`application/json`, Json.obj("error" -> Json.fromString(message)).noSpaces)
+  )
+
   def Ok(json: Json) = HttpResponse(
     200,
     entity = HttpEntity(ContentTypes.`application/json`, json.noSpaces)
   )
+}
+
+object Implicits {
+  implicit class BetterOptional[A](val opt: Optional[A]) extends AnyVal {
+    def asOption: Option[A] = {
+      if (opt.isPresent) {
+        Some(opt.get())
+      } else {
+        None
+      }
+    }
+  }
+}
+
+import java.util.regex.Pattern
+
+case class Regex(originalPattern: String, compiledPattern: Pattern) {
+  def matches(value: String): Boolean = compiledPattern.matcher(value).matches()
+}
+
+object RegexPool {
+
+  private val pool = new java.util.concurrent.ConcurrentHashMap[String, Regex]()
+
+  def apply(originalPattern: String): Regex = {
+    if (!pool.containsKey(originalPattern)) {
+      val processedPattern: String = originalPattern.replace(".", "\\.").replaceAll("\\*", ".*")
+      pool.putIfAbsent(originalPattern, Regex(originalPattern, Pattern.compile(processedPattern)))
+    }
+    pool.get(originalPattern)
+  }
+
+  def regex(originalPattern: String): Regex = {
+    if (!pool.containsKey(originalPattern)) {
+      pool.putIfAbsent(originalPattern, Regex(originalPattern, Pattern.compile(originalPattern)))
+    }
+    pool.get(originalPattern)
+  }
 }

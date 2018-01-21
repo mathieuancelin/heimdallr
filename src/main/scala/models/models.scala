@@ -58,7 +58,7 @@ case class ApiConfig(
 case class ProxyConfig(
     http: HttpConfig = HttpConfig(),
     api: ApiConfig = ApiConfig(),
-    services: Map[String, Service] = Map.empty
+    services: Seq[Service] = Seq.empty
 ) {
   def pretty: String = Encoders.ProxyConfigEncoder.apply(this).spaces2
 }
@@ -95,3 +95,12 @@ object Encoders {
   implicit val ApiConfigEncoder: Encoder[ApiConfig]       = deriveEncoder[ApiConfig]
   implicit val ProxyConfigEncoder: Encoder[ProxyConfig]   = deriveEncoder[ProxyConfig]
 }
+
+trait WithApiKeyOrNot
+case object NoApiKey                  extends WithApiKeyOrNot
+case object BadApiKey                 extends WithApiKeyOrNot
+case class WithApiKey(apiKey: ApiKey) extends WithApiKeyOrNot
+
+trait CallRestriction
+case object PublicCall  extends CallRestriction
+case object PrivateCall extends CallRestriction

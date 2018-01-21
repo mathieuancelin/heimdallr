@@ -11,8 +11,8 @@
     "certPath" : null,
     "certPass" : "uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW"
   },
-  "services" : {
-    "test.foo.bar" : {
+  "services" : [
+    {
       "id" : "UjvBYvkrqADUpq1N",
       "domain" : "test.foo.bar",
       "targets" : [
@@ -40,9 +40,16 @@
         "callTimeout" : 30000,
         "resetTimeout" : 10000
       },
-      "headers": {
+      "headers" : {
         "Authorization" : "basic 1234"
-      }
+      },
+      "targetRoot" : "",
+      "root" : null,
+      "publicPatterns" : [
+        "/*"
+      ],
+      "privatePatterns" : [
+      ]
     }
-  }
+  ]
 }

@@ -5,7 +5,7 @@ import store.Store
 
 class Proxy(config: ProxyConfig) {
 
-  val store     = new Store(config.services)
+  val store     = new Store(config.services.groupBy(_.domain))
   val httpProxy = new HttpProxy(config, store)
   val adminApi  = new AdminApi(config, store)
 

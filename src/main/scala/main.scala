@@ -3,8 +3,8 @@ import models.{ProxyConfig, Service, Target}
 object Main {
   def main(args: Array[String]) {
     val config = ProxyConfig(
-      services = Map(
-        "test.foo.bar" -> Service(
+      services = Seq(
+        Service(
           id = "UjvBYvkrqADUpq1N",
           domain = "test.foo.bar",
           targets = Seq(
@@ -14,7 +14,20 @@ object Main {
           ),
           headers = Map(
             "Authorization" -> "basic 1234"
-          )
+          ),
+          publicPatterns = Seq("/*")
+        ),
+        Service(
+          id = "UjvBYvkrqADUpq1N2",
+          domain = "test.foo.bar",
+          root = Some("/foo"),
+          targets = Seq(
+            Target("http://127.0.0.1:8081")
+          ),
+          headers = Map(
+            "Worked" -> "Yeah"
+          ),
+          publicPatterns = Seq("/*")
         )
       )
     )
