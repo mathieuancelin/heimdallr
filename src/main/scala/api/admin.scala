@@ -2,9 +2,10 @@ package api
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
+import com.codahale.metrics.MetricRegistry
 import io.circe.Json
 import io.circe.parser.parse
 import models._
@@ -15,7 +16,7 @@ import util.HttpsSupport
 
 import scala.concurrent.Future
 
-class AdminApi(config: ProxyConfig, store: Store) {
+class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry) {
 
   implicit val system       = ActorSystem()
   implicit val executor     = system.dispatcher

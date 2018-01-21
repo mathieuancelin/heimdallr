@@ -12,6 +12,7 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.util.FastFuture
 import akka.pattern.CircuitBreaker
 import akka.stream.ActorMaterializer
+import com.codahale.metrics.MetricRegistry
 import models.{WithApiKeyOrNot, _}
 import org.slf4j.LoggerFactory
 import store.Store
@@ -20,24 +21,26 @@ import util.{HttpsSupport, RegexPool, Retry}
 import util.Implicits._
 
 import scala.concurrent.{Future, TimeoutException}
-import scala.util.Try
+import scala.util.{Success, Try}
 
-class HttpProxy(config: ProxyConfig, store: Store) {
+class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry) {
 
   implicit val system       = ActorSystem()
   implicit val executor     = system.dispatcher
   implicit val materializer = ActorMaterializer()
   implicit val http         = Http(system)
 
-  lazy val logger = LoggerFactory.getLogger("http-proxy")
+  lazy val logger = LoggerFactory.getLogger("proxy")
 
-  val decoder = Base64.getDecoder
+  val decoder = Base64.getUrlDecoder
 
   val AbsoluteUri = """(?is)^(https?)://([^/]+)(/.*|$)""".r
 
   val counter = new AtomicInteger(0)
 
   val circuitBreakers = new ConcurrentHashMap[String, CircuitBreaker]()
+
+  val authHeaderName = "Proxy-Authorization"
 
   def extractHost(request: HttpRequest): String = request.uri.toString() match {
     case AbsoluteUri(_, hostPort, _) => hostPort
@@ -59,9 +62,9 @@ class HttpProxy(config: ProxyConfig, store: Store) {
   }
 
   def extractApiKey(request: HttpRequest, service: Service): WithApiKeyOrNot = {
-    request.getHeader("Proxy-Authorization").asOption.flatMap { value =>
+    request.getHeader(authHeaderName).asOption.flatMap { value =>
       Try {
-        val token = value.value().replace("basic ", "")
+        val token = value.value().replace("Basic ", "")
         new String(decoder.decode(token), "UTF-8").split(":").toList match {
           case clientId :: clientSecret :: Nil =>
             service.apiKeys.filter(a => a.clientId == clientId && a.clientSecret == clientSecret).lastOption match {
@@ -89,8 +92,9 @@ class HttpProxy(config: ProxyConfig, store: Store) {
   }
 
   def handler(request: HttpRequest): Future[HttpResponse] = {
+    val start = metrics.timer("proxy-request").time()
     val host = extractHost(request)
-    findService(host, request.uri.path) match {
+    val fu = findService(host, request.uri.path) match {
       case Some(service) => {
         val rawSeq          = service.targets
         val seq             = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
@@ -114,7 +118,7 @@ class HttpProxy(config: ProxyConfig, store: Store) {
                 )
               )
               val headersIn: Seq[HttpHeader] =
-              request.headers.filterNot(t => t.name() == "Host") ++
+              request.headers.filterNot(t => t.name() == "Host" || t.name() == authHeaderName) ++
               service.headers.toSeq.map(t => RawHeader(t._1, t._2)) :+
               Host(target.host) :+
               RawHeader("X-Fowarded-Host", host) :+
@@ -128,7 +132,11 @@ class HttpProxy(config: ProxyConfig, store: Store) {
                 headers = headersIn.toList,
                 protocol = target.protocol
               )
-              circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest))
+              val top = System.currentTimeMillis()
+              circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).andThen {
+                case Success(resp) =>
+                  logger.info(s"${service.id} ${request.method.value} ${request.uri.scheme}://$host${request.uri.path.toString()} -> ${target.url} ${resp.status.value} ${System.currentTimeMillis() - top} ms.")
+              }
             }
             .recover {
               case _: akka.pattern.CircuitBreakerOpenException => BadGateway("Circuit breaker is open")
@@ -136,7 +144,6 @@ class HttpProxy(config: ProxyConfig, store: Store) {
               case e                                           => BadGateway(e.getMessage)
             }
         }
-
         (callRestriction, withApiKeyOrNot) match {
           case (PublicCall, _)                   => makeTheCall()
           case (PrivateCall, NoApiKey)           => FastFuture.successful(Unauthorized("No ApiKey provided"))
@@ -147,6 +154,7 @@ class HttpProxy(config: ProxyConfig, store: Store) {
       }
       case None => FastFuture.successful(NotFound(host))
     }
+    fu.andThen { case _ => start.close() }
   }
 
   def start(): Unit = {

@@ -9,19 +9,20 @@ Experimentatl project about http reverse proxies. Trying new things ...
 - [ ] withConfigFrom(path)
 - [x] additional headers
 - [ ] admin API complete on another port. Add service to serve this api
-- [ ] metrics JMX or statsd with metrics (maybe statsd integration already provided)
+- [x] metrics JMX or statsd with metrics (maybe statsd integration already provided)
 - [x] apikeys on the service (no quotas), clientId, clientSecret, enabled, name
 - [x] pass if public or apikey
 - [x] api integration + main class 
 - [ ] save state to file periodically
 - [x] circuit breaker config in service
 - [x] config for ssl
-- [ ] logs like sozu
-- [ ] matching root
+- [x] logs like sozu
+- [x] matching root
 - [x] target root
 - [x] public / private stuff
 - [ ] find a name for the project
 - [ ] support for WS
+- [ ] support JWT auth
 
 ## Helpers
 
