@@ -137,25 +137,39 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
               val top = System.currentTimeMillis()
               circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).andThen {
                 case Success(resp) =>
-                  logger.info(s"${service.id} ${request.method.value} ${request.uri.scheme}://$host${request.uri.path
+                  logger.info(s"${counter.get()} - ${service.id} ${request.method.value} ${request.uri.scheme}://$host${request.uri.path
                     .toString()} -> ${target.url} ${resp.status.value} ${System.currentTimeMillis() - top} ms.")
               }
             }
             .recover {
-              case _: akka.pattern.CircuitBreakerOpenException => BadGateway("Circuit breaker is open")
-              case _: TimeoutException                         => GatewayTimeout()
-              case e                                           => BadGateway(e.getMessage)
+              case _: akka.pattern.CircuitBreakerOpenException =>
+                request.discardEntityBytes()
+                BadGateway("Circuit breaker is open")
+              case _: TimeoutException                         =>
+                request.discardEntityBytes()
+                GatewayTimeout()
+              case e                                           =>
+                request.discardEntityBytes()
+                BadGateway(e.getMessage)
             }
         }
         (callRestriction, withApiKeyOrNot) match {
           case (PublicCall, _)                   => makeTheCall()
-          case (PrivateCall, NoApiKey)           => FastFuture.successful(Unauthorized("No ApiKey provided"))
+          case (PrivateCall, NoApiKey)           =>
+            request.discardEntityBytes()
+            FastFuture.successful(Unauthorized("No ApiKey provided"))
           case (PrivateCall, WithApiKey(apiKey)) => makeTheCall()
-          case (PrivateCall, BadApiKey)          => FastFuture.successful(Unauthorized("Bad ApiKey provided"))
-          case _                                 => FastFuture.successful(Unauthorized("No ApiKey provided"))
+          case (PrivateCall, BadApiKey)          =>
+            request.discardEntityBytes()
+            FastFuture.successful(Unauthorized("Bad ApiKey provided"))
+          case _                                 =>
+            request.discardEntityBytes()
+            FastFuture.successful(Unauthorized("No ApiKey provided"))
         }
       }
-      case None => FastFuture.successful(NotFound(host))
+      case None =>
+        request.discardEntityBytes()
+        FastFuture.successful(NotFound(host))
     }
     fu.andThen { case _ => start.close() }
   }
