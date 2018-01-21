@@ -1,8 +1,10 @@
 import models.{ProxyConfig, Service, Target}
+import org.slf4j.LoggerFactory
 
 object Main {
   def main(args: Array[String]) {
-    args.find(_.startsWith("--config=")).map(_.replace("--config=", "")).map { path =>
+    args.find(_.startsWith("-Dproxy.config=")).map(_.replace("-Dproxy.config=", "")).map { path =>
+      LoggerFactory.getLogger("proxy").info(s"Loading from $path")
       // Proxy.fromConfigPath("/Users/mathieuancelin/Desktop/reverse-proxy/src/main/resources/proxy.conf")
       Proxy.fromConfigPath(path)
     } getOrElse {
