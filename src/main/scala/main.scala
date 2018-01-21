@@ -3,10 +3,14 @@ import org.slf4j.LoggerFactory
 
 object Main {
   def main(args: Array[String]) {
+    val logger = LoggerFactory.getLogger("proxy")
     args.find(_.startsWith("-Dproxy.config=")).map(_.replace("-Dproxy.config=", "")).map { path =>
-      LoggerFactory.getLogger("proxy").info(s"Loading from $path")
+      logger.info(s"Loading from $path")
       // Proxy.fromConfigPath("/Users/mathieuancelin/Desktop/reverse-proxy/src/main/resources/proxy.conf")
-      Proxy.fromConfigPath(path)
+      Proxy.fromConfigPath(path) match {
+        case Left(e) => logger.error(s"Error while loading config file: $e")
+        case Right(proxy) => proxy.start()
+      }
     } getOrElse {
       val config = ProxyConfig(
         services = Seq(
