@@ -1,8 +1,8 @@
 package proxies
 
-import java.util.{Base64, UUID}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.{Base64, UUID}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -13,6 +13,8 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.util.FastFuture
 import akka.pattern.CircuitBreaker
 import akka.stream.ActorMaterializer
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
 import com.codahale.metrics.MetricRegistry
 import models.{WithApiKeyOrNot, _}
 import org.slf4j.LoggerFactory
@@ -65,16 +67,35 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
   }
 
   def extractApiKey(request: HttpRequest, service: Service): WithApiKeyOrNot = {
-    request.getHeader(authHeaderName).asOption.flatMap { value =>
+    request.getHeader(authHeaderName).asOption.flatMap { header =>
       Try {
-        val token = value.value().replace("Basic ", "")
-        new String(decoder.decode(token), "UTF-8").split(":").toList match {
-          case clientId :: clientSecret :: Nil =>
-            service.apiKeys.filter(a => a.enabled && a.clientId == clientId && a.clientSecret == clientSecret).lastOption match {
-              case Some(apiKey) => WithApiKey(apiKey)
-              case None         => BadApiKey
-            }
-          case _ => NoApiKey
+        val value = header.value()
+        if (value.startsWith("Basic")) {
+          val token = value.replace("Basic ", "")
+          new String(decoder.decode(token), "UTF-8").split(":").toList match {
+            case clientId :: clientSecret :: Nil =>
+              service.apiKeys
+                .filter(a => a.enabled && a.clientId == clientId && a.clientSecret == clientSecret)
+                .lastOption match {
+                case Some(apiKey) => WithApiKey(apiKey)
+                case None         => BadApiKey
+              }
+            case _ => NoApiKey
+          }
+        } else if (value.startsWith("Bearer")) {
+          val token = value.replace("Bearer ", "")
+          val JWTToken = JWT.decode(token)
+          val issuer = JWTToken.getIssuer
+          service.apiKeys.find(apk => apk.enabled && apk.clientId == issuer) match {
+            case Some(key) =>
+              val algorithm = Algorithm.HMAC512(key.clientSecret)
+              val verifier = JWT.require(algorithm).withIssuer(JWTToken.getIssuer).build
+              verifier.verify(token)
+              WithApiKey(key)
+            case None => BadApiKey
+          }
+        } else {
+          NoApiKey
         }
       }.toOption
     } match {
@@ -95,9 +116,9 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
   }
 
   def handler(request: HttpRequest): Future[HttpResponse] = {
-    val start = metrics.timer("proxy-request").time()
+    val start     = metrics.timer("proxy-request").time()
     val requestId = UUID.randomUUID().toString
-    val host  = extractHost(request)
+    val host      = extractHost(request)
     val fu = findService(host, request.uri.path) match {
       case Some(service) => {
         val rawSeq          = service.targets

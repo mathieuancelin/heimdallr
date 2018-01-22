@@ -11,19 +11,20 @@ libraryDependencies ++= {
   lazy val akkaHttpVersion2 = "10.1.0-RC1"
   lazy val akkaVersion      = "2.5.9"
   Seq(
-    "com.typesafe.akka"     %% "akka-http"          % akkaHttpVersion2,
-    "com.typesafe.akka"     %% "akka-http2-support" % akkaHttpVersion2,
-    "com.typesafe.akka"     %% "akka-stream"        % akkaVersion,
-    "com.typesafe.akka"     %% "akka-actor"         % akkaVersion,
-    "com.typesafe.play"     %% "play-json"          % "2.6.8",
-    "org.gnieh"             %% "diffson-play-json"  % "2.2.3",
-    "ch.qos.logback"        % "logback-classic"     % "1.2.3",
-    "io.dropwizard.metrics" % "metrics-core"        % "4.0.2",
-    "io.dropwizard.metrics" % "metrics-jmx"         % "4.0.2",
-    "io.circe"              %% "circe-core"         % "0.9.0",
-    "io.circe"              %% "circe-generic"      % "0.9.0",
-    "io.circe"              %% "circe-parser"       % "0.9.0",
-    "io.circe"              %% "circe-optics"       % "0.9.0"
+    "com.typesafe.akka"      %% "akka-http"          % akkaHttpVersion2,
+    "com.typesafe.akka"      %% "akka-http2-support" % akkaHttpVersion2,
+    "com.typesafe.akka"      %% "akka-stream"        % akkaVersion,
+    "com.typesafe.akka"      %% "akka-actor"         % akkaVersion,
+    "org.gnieh"              %% "diffson-circe"      % "2.2.4",
+    "ch.qos.logback"         % "logback-classic"     % "1.2.3",
+    "io.dropwizard.metrics"  % "metrics-core"        % "4.0.2",
+    "io.dropwizard.metrics"  % "metrics-jmx"         % "4.0.2",
+    "io.circe"               %% "circe-core"         % "0.9.0",
+    "io.circe"               %% "circe-generic"      % "0.9.0",
+    "io.circe"               %% "circe-parser"       % "0.9.0",
+    "io.circe"               %% "circe-optics"       % "0.9.0",
+    "org.mortbay.jetty.alpn" % "jetty-alpn-agent"    % "2.0.6",
+    "com.auth0"              % "java-jwt"            % "3.3.0"
   )
 }
 

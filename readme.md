@@ -13,7 +13,7 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [x] apikeys on the service (no quotas), clientId, clientSecret, enabled, name
 - [x] pass if public or apikey
 - [x] api integration + main class 
-- [ ] save state to file periodically
+- [x] save state to file periodically
 - [x] circuit breaker config in service
 - [x] config for ssl
 - [x] logs like sozu
@@ -22,16 +22,16 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [x] public / private stuff
 - [ ] find a name for the project
 - [ ] support for WS
-- [ ] support JWT auth
+- [x] support JWT auth
 - [x] start https only if certificate provided
 - [x] smaller https password
 - [x] httpscontext from .pem ?
-- [ ] pass --log.config=
-- [ ] pass --proxy.config=prod.xml
+- [x] pass --log.config=
+- [x] pass --proxy.config=prod.xml
 - [x] pass --proxy.state=
-- [ ] try sozu state.json
+- [x] try sozu state.json
 - [x] shutdown hook in main
-- [ ] provide apln support with agent from jar if JDK8
+- [x] provide apln support with agent from jar if JDK8
 
 ## Helpers
 

@@ -16,7 +16,7 @@ object HttpsSupport {
   def context(certificatePath: String, pass: String, keyStoreType: String = "PKCS12"): HttpsConnectionContext = {
     val password: Array[Char] = pass.toCharArray
 
-    val ks: KeyStore = KeyStore.getInstance(keyStoreType)
+    val ks: KeyStore          = KeyStore.getInstance(keyStoreType)
     val keystore: InputStream = new FileInputStream(new File(certificatePath))
 
     require(keystore != null, "Keystore required!")

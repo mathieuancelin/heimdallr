@@ -1,4 +1,4 @@
-import java.io.File
+import java.io.{File, FileInputStream}
 import java.util.concurrent.TimeUnit
 
 import api.AdminApi
@@ -9,11 +9,14 @@ import models._
 import proxies.HttpProxy
 import store.Store
 import util.{Startable, Stoppable}
+import ch.qos.logback.classic.LoggerContext
+import ch.qos.logback.classic.joran.JoranConfigurator
+import org.slf4j.LoggerFactory
 
 class Proxy(config: ProxyConfig) extends Startable[Proxy] with Stoppable[Proxy] {
 
   val metrics   = new MetricRegistry()
-  val store     = new Store(config.services.groupBy(_.domain), metrics)
+  val store     = new Store(config.services.groupBy(_.domain), config.statePath, metrics)
   val httpProxy = new HttpProxy(config, store, metrics)
   val adminApi  = new AdminApi(config, store, metrics)
 
@@ -23,7 +26,20 @@ class Proxy(config: ProxyConfig) extends Startable[Proxy] with Stoppable[Proxy] 
     .convertDurationsTo(TimeUnit.MILLISECONDS)
     .build()
 
-  def start(): Stoppable[Proxy] = {
+  private def setupLoggers(): Unit = {
+    config.logConfigPath.foreach { path =>
+      val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
+      loggerContext.reset()
+      val configurator = new JoranConfigurator
+      val configStream = new FileInputStream(new File(path))
+      configurator.setContext(loggerContext)
+      configurator.doConfigure(configStream)
+      configStream.close()
+    }
+  }
+
+  override def start(): Stoppable[Proxy] = {
+    setupLoggers()
     store.start()
     httpProxy.start()
     adminApi.start()

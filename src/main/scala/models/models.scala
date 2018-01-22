@@ -62,7 +62,9 @@ case class ApiConfig(
 case class ProxyConfig(
     http: HttpConfig = HttpConfig(),
     api: ApiConfig = ApiConfig(),
-    services: Seq[Service] = Seq.empty
+    services: Seq[Service] = Seq.empty,
+    logConfigPath: Option[String] = None,
+    statePath: Option[String] = None
 ) {
   def pretty: String = Encoders.ProxyConfigEncoder.apply(this).spaces2
 }
