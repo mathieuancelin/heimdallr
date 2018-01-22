@@ -13,13 +13,11 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 object HttpsSupport {
-  def context(pass: String, certPath: Option[String] = None): HttpsConnectionContext = {
+  def context(certificatePath: String, pass: String, keyStoreType: String = "PKCS12"): HttpsConnectionContext = {
     val password: Array[Char] = pass.toCharArray
 
-    val ks: KeyStore = KeyStore.getInstance("PKCS12")
-    val keystore: InputStream = certPath
-      .map(c => new FileInputStream(new File(c)))
-      .getOrElse(getClass.getClassLoader.getResourceAsStream("foo.bar.p12"))
+    val ks: KeyStore = KeyStore.getInstance(keyStoreType)
+    val keystore: InputStream = new FileInputStream(new File(certificatePath))
 
     require(keystore != null, "Keystore required!")
     ks.load(keystore, password)

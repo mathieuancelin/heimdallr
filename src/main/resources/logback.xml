@@ -21,8 +21,7 @@
         <appender-ref ref="STDOUT" />
     </appender>
 
-    <logger name="proxy" level="WARN" />
-    <logger name="admin-api" level="INFO" />
+    <logger name="proxy" level="INFO" />
 
     <root level="INFO">
         <!--appender-ref ref="ASYNCFILE" /-->

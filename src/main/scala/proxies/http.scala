@@ -1,6 +1,6 @@
 package proxies
 
-import java.util.Base64
+import java.util.{Base64, UUID}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -96,6 +96,7 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
 
   def handler(request: HttpRequest): Future[HttpResponse] = {
     val start = metrics.timer("proxy-request").time()
+    val requestId = UUID.randomUUID().toString
     val host  = extractHost(request)
     val fu = findService(host, request.uri.path) match {
       case Some(service) => {
@@ -127,6 +128,7 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
                   request.headers.filterNot(t => t.name() == "Host" || t.name() == authHeaderName) ++
                   service.headers.toSeq.map(t => RawHeader(t._1, t._2)) :+
                   Host(target.host) :+
+                  RawHeader("X-Request-Id", requestId) :+
                   RawHeader("X-Fowarded-Host", host) :+
                   RawHeader("X-Fowarded-Scheme", request.uri.scheme)
                   val proxyRequest = request.copy(
@@ -142,8 +144,8 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
                   circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).andThen {
                     case Success(resp) =>
                       logger.info(
-                        s"${counter.get()} - ${service.id} ${request.method.value} ${request.uri.scheme}://$host${request.uri.path
-                          .toString()} -> ${target.url} ${resp.status.value} ${System.currentTimeMillis() - top} ms."
+                        s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
+                          .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
                       )
                   }
                 }
@@ -183,10 +185,13 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
   }
 
   def start(): Stoppable[HttpProxy] = {
-    val httpsContext = HttpsSupport.context(config.http.certPass, config.http.certPath)
+    logger.info(s"Listening for http call on http://${config.http.listenOn}:${config.http.httpPort}")
     http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpPort)
-    http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpsPort, connectionContext = httpsContext)
-    logger.info(s"Listening on http://${config.http.listenOn}:${config.http.httpPort} and https://${config.http.listenOn}:${config.http.httpsPort}")
+    config.http.certPath.foreach { path =>
+      val httpsContext = HttpsSupport.context(path, config.http.certPass.get, config.http.keyStoreType)
+      logger.info(s"Listening for http calls on https://${config.http.listenOn}:${config.http.httpsPort}")
+      http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpsPort, connectionContext = httpsContext)
+    }
     this
   }
 

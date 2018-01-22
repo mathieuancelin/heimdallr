@@ -46,15 +46,17 @@ case class HttpConfig(
     httpPort: Int = 8080,
     httpsPort: Int = 8443,
     listenOn: String = "0.0.0.0",
+    keyStoreType: String = "PKCS12",
     certPath: Option[String] = None,
-    certPass: String = "uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW"
+    certPass: Option[String] = None
 )
 case class ApiConfig(
     httpPort: Int = 9080,
     httpsPort: Int = 9443,
     listenOn: String = "127.0.0.1",
+    keyStoreType: String = "PKCS12",
     certPath: Option[String] = None,
-    certPass: String = "uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW"
+    certPass: Option[String] = None
 )
 
 case class ProxyConfig(

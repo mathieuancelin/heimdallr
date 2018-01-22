@@ -1,4 +1,4 @@
-export PW="uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW"
+export PW="ouhUpHgmowd2xXz3"
 
 # Generate Certificate Authority to sign certificate
 keytool -genkeypair -v \

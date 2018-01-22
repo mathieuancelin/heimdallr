@@ -4,12 +4,14 @@ import org.slf4j.LoggerFactory
 object Main {
   def main(args: Array[String]) {
     val logger = LoggerFactory.getLogger("proxy")
-    args.find(_.startsWith("-Dproxy.config=")).map(_.replace("-Dproxy.config=", "")).map { path =>
+    args.find(_.startsWith("--proxy.config=")).map(_.replace("--proxy.config=", "")).map { path =>
       logger.info(s"Loading from $path")
       // Proxy.fromConfigPath("/Users/mathieuancelin/Desktop/reverse-proxy/src/main/resources/proxy.conf")
       Proxy.fromConfigPath(path) match {
         case Left(e)      => logger.error(s"Error while loading config file: $e")
-        case Right(proxy) => proxy.start()
+        case Right(proxy) =>
+          val stop = proxy.start()
+          Runtime.getRuntime.addShutdownHook(new Thread(() => stop.stop()))
       }
     } getOrElse {
       val config = ProxyConfig(
@@ -57,7 +59,8 @@ object Main {
         )
       )
       // println(config.pretty)
-      Proxy.withConfig(config).start()
+      val stop = Proxy.withConfig(config).start()
+      Runtime.getRuntime.addShutdownHook(new Thread(() => stop.stop()))
     }
   }
 }
