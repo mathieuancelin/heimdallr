@@ -4,11 +4,13 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 
 ## Features
 
+- [ ] find a name for the project
+- [ ] admin API complete on another port. Add service to serve this api
+- [ ] write some docs in readme
 - [x] ProxyConfig object for Api integration
 - [x] withConfig(ProxyConfig)
 - [x] withConfigFrom(path)
 - [x] additional headers
-- [ ] admin API complete on another port. Add service to serve this api
 - [x] metrics JMX or statsd with metrics (maybe statsd integration already provided)
 - [x] apikeys on the service (no quotas), clientId, clientSecret, enabled, name
 - [x] pass if public or apikey
@@ -16,22 +18,16 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [x] save state to file periodically
 - [x] circuit breaker config in service
 - [x] config for ssl
-- [x] logs like sozu
 - [x] matching root
 - [x] target root
 - [x] public / private stuff
-- [ ] find a name for the project
 - [x] support for WS
 - [x] support JWT auth
 - [x] start https only if certificate provided
 - [x] smaller https password
-- [x] httpscontext from .pem ?
-- [x] pass --log.config=
-- [x] pass --proxy.config=prod.xml
-- [x] pass --proxy.state=
-- [x] try sozu state.json
+- [x] pass --proxy.config=???
+- [x] pass --proxy.config=???
 - [x] shutdown hook in main
-- [x] provide apln support with agent from jar if JDK8
 
 ## Helpers
 
