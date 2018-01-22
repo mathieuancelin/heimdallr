@@ -5,10 +5,10 @@ object Main {
   def main(args: Array[String]) {
     val logger = LoggerFactory.getLogger("proxy")
     args.find(_.startsWith("--proxy.config=")).map(_.replace("--proxy.config=", "")).map { path =>
-      logger.info(s"Loading from $path")
+      logger.info(s"Loading configuration from file @ $path")
       // Proxy.fromConfigPath("/Users/mathieuancelin/Desktop/reverse-proxy/src/main/resources/proxy.conf")
       Proxy.fromConfigPath(path) match {
-        case Left(e)      => logger.error(s"Error while loading config file: $e")
+        case Left(e)      => logger.error(s"Error while loading config file @ $path: $e")
         case Right(proxy) => proxy.start().stopOnShutdown()
       }
     } getOrElse {
@@ -23,7 +23,7 @@ object Main {
               Target("http://127.0.0.1:8082"),
               Target("http://127.0.0.1:8083")
             ),
-            headers = Map(
+            additionalHeaders = Map(
               "Authorization" -> "basic 1234"
             ),
             publicPatterns = Seq("/*")
@@ -35,7 +35,7 @@ object Main {
             targets = Seq(
               Target("http://127.0.0.1:8081")
             ),
-            headers = Map(
+            additionalHeaders = Map(
               "Worked" -> "Yeah"
             ),
             publicPatterns = Seq("/*")

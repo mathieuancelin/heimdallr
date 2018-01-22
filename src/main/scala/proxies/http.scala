@@ -52,16 +52,23 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
     case _                           => request.header[Host].map(_.host.address()).getOrElse("--")
   }
 
-  def findService(host: String, path: Uri.Path): Option[Service] = {
+  def findService(host: String, path: Uri.Path, headers: Map[String, HttpHeader]): Option[Service] = {
     val uri = path.toString()
     store.get().get(host).flatMap { services =>
-      services.sortWith((a, _) => a.root.isDefined).find { s =>
+      // TODO : optimize this part (costs 100 hits/sec)
+      services.sortWith((a, _) => a.root.isDefined).filter { s =>
         if (s.root.isDefined) {
           uri.startsWith(s.root.get)
         } else {
           true
         }
-      }
+      } filter { s =>
+        if (s.matchingHeaders.nonEmpty) {
+          s.matchingHeaders.toSeq.map(t => headers.get(t._1).exists(_.value() == t._2)).find(_ == false).isEmpty
+        } else {
+          true
+        }
+      } headOption
     }
     // store.get().get(host).flatMap(_.lastOption)
   }
@@ -119,7 +126,7 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
     val start     = metrics.timer("proxy-request").time()
     val requestId = UUID.randomUUID().toString
     val host      = extractHost(request)
-    val fu = findService(host, request.uri.path) match {
+    val fu = findService(host, request.uri.path, request.headers.groupBy(_.name()).mapValues(_.last)) match {
       case Some(service) => {
         val rawSeq          = service.targets
         val seq             = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
@@ -144,7 +151,7 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
               )
               val headersIn: Seq[HttpHeader] =
               request.headers.filterNot(t => t.name() == "Host" || t.name() == authHeaderName) ++
-              service.headers.toSeq.map(t => RawHeader(t._1, t._2)) :+
+              service.additionalHeaders.toSeq.map(t => RawHeader(t._1, t._2)) :+
               Host(target.host) :+
               RawHeader("X-Request-Id", requestId) :+
               RawHeader("X-Fowarded-Host", host) :+

@@ -2,16 +2,16 @@ import java.io.{File, FileInputStream}
 import java.util.concurrent.TimeUnit
 
 import api.AdminApi
+import ch.qos.logback.classic.LoggerContext
+import ch.qos.logback.classic.joran.JoranConfigurator
 import com.codahale.metrics.MetricRegistry
 import com.codahale.metrics.jmx.JmxReporter
 import com.typesafe.config.{ConfigFactory, ConfigRenderOptions}
 import models._
+import org.slf4j.LoggerFactory
 import proxies.HttpProxy
 import store.Store
 import util.{Startable, Stoppable}
-import ch.qos.logback.classic.LoggerContext
-import ch.qos.logback.classic.joran.JoranConfigurator
-import org.slf4j.LoggerFactory
 
 class Proxy(config: ProxyConfig) extends Startable[Proxy] with Stoppable[Proxy] {
 

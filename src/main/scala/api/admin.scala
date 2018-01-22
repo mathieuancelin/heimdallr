@@ -4,10 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.ActorMaterializer
-import akka.util.ByteString
 import com.codahale.metrics.MetricRegistry
-import io.circe.Json
-import io.circe.parser.parse
 import models._
 import org.slf4j.LoggerFactory
 import store.Store

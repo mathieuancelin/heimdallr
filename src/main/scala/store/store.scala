@@ -42,7 +42,9 @@ class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Serv
             case Left(e) =>
               logger.error(s"Error while parsing state file: ${e.message}")
               initialState
-            case Right(services) => services.groupBy(_.domain)
+            case Right(services) =>
+              logger.info(s"Loading state from ${file.toPath.toString}")
+              services.groupBy(_.domain)
           }
       }
     } getOrElse {
