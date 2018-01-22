@@ -21,7 +21,7 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [x] target root
 - [x] public / private stuff
 - [ ] find a name for the project
-- [ ] support for WS
+- [x] support for WS
 - [x] support JWT auth
 - [x] start https only if certificate provided
 - [x] smaller https password

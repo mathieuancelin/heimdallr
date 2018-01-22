@@ -22,6 +22,7 @@
     </appender>
 
     <logger name="proxy" level="INFO" />
+    <logger name="proxy-ws" level="INFO" />
 
     <root level="INFO">
         <!--appender-ref ref="ASYNCFILE" /-->

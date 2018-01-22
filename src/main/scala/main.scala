@@ -9,9 +9,7 @@ object Main {
       // Proxy.fromConfigPath("/Users/mathieuancelin/Desktop/reverse-proxy/src/main/resources/proxy.conf")
       Proxy.fromConfigPath(path) match {
         case Left(e) => logger.error(s"Error while loading config file: $e")
-        case Right(proxy) =>
-          val stop = proxy.start()
-          Runtime.getRuntime.addShutdownHook(new Thread(() => stop.stop()))
+        case Right(proxy) => proxy.start().stopOnShutdown()
       }
     } getOrElse {
       val config = ProxyConfig(
@@ -60,8 +58,7 @@ object Main {
         )
       )
       // println(config.pretty)
-      val stop = Proxy.withConfig(config).start()
-      Runtime.getRuntime.addShutdownHook(new Thread(() => stop.stop()))
+      Proxy.withConfig(config).start().stopOnShutdown()
     }
   }
 }

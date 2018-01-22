@@ -128,61 +128,76 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
 
         @inline
         def makeTheCall(): Future[HttpResponse] = {
-          request.header[UpgradeToWebSocket] match {
-            case Some(upgrade) => ???
-            case None => {
-              Retry
-                .retry(service.clientConfig.retry) {
-                  val index  = counter.incrementAndGet() % (if (seq.nonEmpty) seq.size else 1)
-                  val target = seq.apply(index)
-                  val circuitBreaker = circuitBreakers.computeIfAbsent(
-                    target.url,
-                    _ =>
-                      new CircuitBreaker(
-                        system.scheduler,
-                        maxFailures = service.clientConfig.maxFailures,
-                        callTimeout = service.clientConfig.callTimeout,
-                        resetTimeout = service.clientConfig.resetTimeout
-                    )
+          Retry
+            .retry(service.clientConfig.retry) {
+              val index  = counter.incrementAndGet() % (if (seq.nonEmpty) seq.size else 1)
+              val target = seq.apply(index)
+              val circuitBreaker = circuitBreakers.computeIfAbsent(
+                target.url,
+                _ =>
+                  new CircuitBreaker(
+                    system.scheduler,
+                    maxFailures = service.clientConfig.maxFailures,
+                    callTimeout = service.clientConfig.callTimeout,
+                    resetTimeout = service.clientConfig.resetTimeout
+                )
+              )
+              val headersIn: Seq[HttpHeader] =
+              request.headers.filterNot(t => t.name() == "Host" || t.name() == authHeaderName) ++
+              service.headers.toSeq.map(t => RawHeader(t._1, t._2)) :+
+              Host(target.host) :+
+              RawHeader("X-Request-Id", requestId) :+
+              RawHeader("X-Fowarded-Host", host) :+
+              RawHeader("X-Fowarded-Scheme", request.uri.scheme)
+              val proxyRequest = request.copy(
+                uri = request.uri.copy(
+                  path = Uri.Path(service.targetRoot) ++ request.uri.path,
+                  scheme = target.scheme,
+                  authority = Authority(host = Uri.NamedHost(target.host), port = target.port)
+                ),
+                headers = headersIn.toList,
+                protocol = target.protocol
+              )
+              val top = System.currentTimeMillis()
+              request.header[UpgradeToWebSocket] match {
+                case Some(upgrade) => {
+                  val flow = ActorFlow.actorRef(
+                    out => WebSocketProxyActor.props(proxyRequest.uri, materializer, out, http, headersIn)
                   )
-                  val headersIn: Seq[HttpHeader] =
-                  request.headers.filterNot(t => t.name() == "Host" || t.name() == authHeaderName) ++
-                  service.headers.toSeq.map(t => RawHeader(t._1, t._2)) :+
-                  Host(target.host) :+
-                  RawHeader("X-Request-Id", requestId) :+
-                  RawHeader("X-Fowarded-Host", host) :+
-                  RawHeader("X-Fowarded-Scheme", request.uri.scheme)
-                  val proxyRequest = request.copy(
-                    uri = request.uri.copy(
-                      path = Uri.Path(service.targetRoot) ++ request.uri.path,
-                      scheme = target.scheme,
-                      authority = Authority(host = Uri.NamedHost(target.host), port = target.port)
-                    ),
-                    headers = headersIn.toList,
-                    protocol = target.protocol
-                  )
-                  val top = System.currentTimeMillis()
-                  circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).andThen {
+                  FastFuture.successful(upgrade.handleMessages(flow)).andThen {
                     case Success(resp) =>
                       logger.info(
-                        s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
-                          .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
+                        s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${
+                          request.uri.path
+                            .toString()
+                        } ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
                       )
                   }
                 }
-                .recover {
-                  case _: akka.pattern.CircuitBreakerOpenException =>
-                    request.discardEntityBytes()
-                    BadGateway("Circuit breaker is open")
-                  case _: TimeoutException =>
-                    request.discardEntityBytes()
-                    GatewayTimeout()
-                  case e =>
-                    request.discardEntityBytes()
-                    BadGateway(e.getMessage)
+                case None => {
+                  circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).andThen {
+                    case Success(resp) =>
+                      logger.info(
+                        s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${
+                          request.uri.path
+                            .toString()
+                        } ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
+                      )
+                  }
                 }
+              }
             }
-          }
+            .recover {
+              case _: akka.pattern.CircuitBreakerOpenException =>
+                request.discardEntityBytes()
+                BadGateway("Circuit breaker is open")
+              case _: TimeoutException =>
+                request.discardEntityBytes()
+                GatewayTimeout()
+              case e =>
+                request.discardEntityBytes()
+                BadGateway(e.getMessage)
+            }
         }
         (callRestriction, withApiKeyOrNot) match {
           case (PublicCall, _) => makeTheCall()

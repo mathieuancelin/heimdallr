@@ -5,8 +5,11 @@ import java.security.{KeyStore, SecureRandom}
 import java.util.Optional
 import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
 
+import akka.actor.{Actor, ActorRef, ActorRefFactory, OneForOneStrategy, PoisonPill, Props, Status, SupervisorStrategy, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.{ConnectionContext, HttpsConnectionContext}
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import akka.stream.{Materializer, OverflowStrategy}
 import io.circe.Json
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -140,4 +143,37 @@ trait Startable[A] {
 
 trait Stoppable[A] {
   def stop(): Unit
+  def stopOnShutdown(): Unit = {
+    Runtime.getRuntime.addShutdownHook(new Thread(() => stop()))
+  }
+}
+
+case object CloseMessage
+
+object ActorFlow {
+
+  def actorRef[In, Out](props: ActorRef => Props, bufferSize: Int = 16, overflowStrategy: OverflowStrategy = OverflowStrategy.dropNew)(implicit factory: ActorRefFactory, mat: Materializer): Flow[In, Out, _] = {
+
+    val (outActor, publisher) = Source.actorRef[Out](bufferSize, overflowStrategy)
+      .toMat(Sink.asPublisher(false))(Keep.both).run()
+
+    Flow.fromSinkAndSource(
+      Sink.actorRef(factory.actorOf(Props(new Actor {
+        val flowActor = context.watch(context.actorOf(props(outActor), "flowActor"))
+
+        def receive = {
+          case Status.Success(_) | Status.Failure(_) =>
+            flowActor ! CloseMessage
+            flowActor ! PoisonPill
+          case Terminated(_) => context.stop(self)
+          case other => flowActor ! other
+        }
+
+        override def supervisorStrategy = OneForOneStrategy() {
+          case _ => SupervisorStrategy.Stop
+        }
+      })), Status.Success(())),
+      Source.fromPublisher(publisher)
+    )
+  }
 }
