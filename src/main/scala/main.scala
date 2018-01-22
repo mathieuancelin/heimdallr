@@ -16,7 +16,7 @@ object Main {
         // statePath = Some("./state.json"),
         services = Seq(
           Service(
-            id = "UjvBYvkrqADUpq1N",
+            id = "load-balancing-test",
             domain = "test.foo.bar",
             targets = Seq(
               Target("http://127.0.0.1:8081"),
@@ -29,7 +29,7 @@ object Main {
             publicPatterns = Seq("/*")
           ),
           Service(
-            id = "UjvBYvkrqADUpq1N2",
+            id = "matching-root-test",
             domain = "test.foo.bar",
             root = Some("/foo"),
             targets = Seq(
@@ -41,7 +41,7 @@ object Main {
             publicPatterns = Seq("/*")
           ),
           Service(
-            id = "proxy-admin",
+            id = "admin-api",
             domain = "admin-api.foo.bar",
             targets = Seq(
               Target("http://127.0.0.1:9080")
