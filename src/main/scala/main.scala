@@ -1,4 +1,4 @@
-import models.{ProxyConfig, Service, Target}
+import models.{ApiKey, ProxyConfig, Service, Target}
 import org.slf4j.LoggerFactory
 
 object Main {
@@ -38,6 +38,21 @@ object Main {
               "Worked" -> "Yeah"
             ),
             publicPatterns = Seq("/*")
+          ),
+          Service(
+            id = "proxy-admin",
+            domain = "admin-api.foo.bar",
+            targets = Seq(
+              Target("http://127.0.0.1:9080")
+            ),
+            apiKeys = Seq(
+              ApiKey(
+                clientId = "SIVt3w0khFY5qP92",
+                clientSecret = "KVJxk0huwCj8984MZ9sxCXhqV7PUwWK5",
+                name = "admin-apikey",
+                enabled = true
+              )
+            )
           )
         )
       )

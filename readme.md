@@ -23,6 +23,15 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [ ] find a name for the project
 - [ ] support for WS
 - [ ] support JWT auth
+- [ ] start https only if certificate provided
+- [ ] smaller https pass
+- [ ] httpscontext from .pem ?
+- [ ] pass --log.config=
+- [ ] pass --proxy.config=prod.xml
+- [ ] pass --proxy.state=
+- [ ] try sozu state.json
+- [ ] shutdown hook in main
+- [ ] provide apln support with agent from jar if jDK8
 
 ## Helpers
 

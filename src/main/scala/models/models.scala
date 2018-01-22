@@ -45,12 +45,14 @@ case class Service(id: String,
 case class HttpConfig(
     httpPort: Int = 8080,
     httpsPort: Int = 8443,
+    listenOn: String = "0.0.0.0",
     certPath: Option[String] = None,
     certPass: String = "uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW"
 )
 case class ApiConfig(
     httpPort: Int = 9080,
     httpsPort: Int = 9443,
+    listenOn: String = "127.0.0.1",
     certPath: Option[String] = None,
     certPass: String = "uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW"
 )

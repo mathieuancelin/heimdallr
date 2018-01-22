@@ -62,9 +62,9 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
 
   def start(): Stoppable[AdminApi] = {
     val httpsContext = HttpsSupport.context(config.api.certPass, config.api.certPath)
-    http.bindAndHandleAsync(handler, "0.0.0.0", config.api.httpPort)
-    http.bindAndHandleAsync(handler, "0.0.0.0", config.api.httpsPort, connectionContext = httpsContext)
-    logger.info(s"Listening on http://0.0.0.0:${config.api.httpPort} and https://0.0.0.0:${config.api.httpsPort}")
+    http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpPort)
+    http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpsPort, connectionContext = httpsContext)
+    logger.info(s"Listening on http://${config.api.listenOn}:${config.api.httpPort} and https://${config.api.listenOn}:${config.api.httpsPort}")
     this
   }
 

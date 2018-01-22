@@ -21,7 +21,7 @@
         <appender-ref ref="STDOUT" />
     </appender>
 
-    <logger name="proxy" level="INFO" />
+    <logger name="proxy" level="WARN" />
     <logger name="admin-api" level="INFO" />
 
     <root level="INFO">
