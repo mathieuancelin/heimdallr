@@ -13,13 +13,8 @@ import util.CloseMessage
 
 import scala.util.{Failure, Success}
 
-
 object WebSocketProxyActor {
-  def props(url: Uri,
-            mat: Materializer,
-            out: ActorRef,
-            http: akka.http.scaladsl.HttpExt,
-            headers: Seq[HttpHeader]) =
+  def props(url: Uri, mat: Materializer, out: ActorRef, http: akka.http.scaladsl.HttpExt, headers: Seq[HttpHeader]) =
     Props(new WebSocketProxyActor(url, mat, out, http, headers))
 }
 
@@ -28,7 +23,7 @@ class WebSocketProxyActor(uri: Uri,
                           out: ActorRef,
                           http: akka.http.scaladsl.HttpExt,
                           headers: Seq[HttpHeader])
-  extends Actor {
+    extends Actor {
 
   lazy val logger = LoggerFactory.getLogger("proxy-ws")
   lazy val source = Source.queue[Message](50000, OverflowStrategy.dropTail)
@@ -47,15 +42,21 @@ class WebSocketProxyActor(uri: Uri,
         uri = uri,
         extraHeaders = headers.filterNot(h => avoid.contains(h.name())).toList
       )
+      logger.debug(
+        "[WEBSOCKET] initializing client call ... " + request.uri.toString() + " " + request.extraHeaders.mkString(", ")
+      )
       val (connected, materialized) = http.singleWebSocketRequest(
         request,
         Flow
           .fromSinkAndSourceMat(
-            Sink.foreach[Message](msq => out ! msq),
+            Sink.foreach[Message] { msq =>
+              logger.debug(s"[WEBSOCKET] message from target: ${msq.toString}")
+              out ! msq
+            },
             source
           )(Keep.both)
           .alsoTo(Sink.onComplete { _ =>
-            logger.info(s"[WEBSOCKET] target stopped")
+            logger.debug(s"[WEBSOCKET] target stopped")
             Option(queueRef.get()).foreach(_.complete())
             out ! PoisonPill
           })
@@ -63,11 +64,11 @@ class WebSocketProxyActor(uri: Uri,
       queueRef.set(materialized._2)
       connected.andThen {
         case Success(r) => {
-          logger.info(
+          logger.debug(
             s"[WEBSOCKET] connected to target ${r.response.status} :: ${r.response.headers.map(h => h.toString()).mkString(", ")}"
           )
           r.response.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { bs =>
-            logger.info(s"[WEBSOCKET] connected to target with response '${bs.utf8String}'")
+            logger.debug(s"[WEBSOCKET] connected to target with response '${bs.utf8String}'")
           }
         }
         case Failure(e) => logger.error(s"[WEBSOCKET] error", e)
@@ -77,13 +78,14 @@ class WebSocketProxyActor(uri: Uri,
     }
 
   override def postStop() = {
-    logger.info(s"[WEBSOCKET] client stopped")
+    logger.debug(s"[WEBSOCKET] client stopped")
     Option(queueRef.get()).foreach(_.complete())
     out ! PoisonPill
   }
 
   def receive = {
     case msg: Message => {
+      logger.debug(s"[WEBSOCKET] message from client: ${msg}")
       Option(queueRef.get()).foreach(_.offer(msg))
     }
     case CloseMessage => {

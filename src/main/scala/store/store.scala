@@ -13,15 +13,16 @@ import util.{Startable, Stoppable}
 
 import scala.concurrent.duration._
 
-
 case class UpdateStoreFile(path: String, state: Map[String, Seq[Service]])
 
-class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Service]], statePath: Option[String], metrics: MetricRegistry)
+class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Service]],
+            statePath: Option[String],
+            metrics: MetricRegistry)
     extends Startable[Store]
     with Stoppable[Store] {
 
-  private implicit val system       = ActorSystem()
-  private implicit val executor     = system.dispatcher
+  private implicit val system   = ActorSystem()
+  private implicit val executor = system.dispatcher
 
   private val actor = system.actorOf(FileWriter.props())
 
@@ -36,12 +37,13 @@ class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Serv
         case Left(e) =>
           logger.error(s"Error while parsing state file: ${e.message}")
           initialState
-        case Right(json) => json.as[Seq[Service]](Decoder.decodeSeq(Decoders.ServiceDecoder)) match {
-          case Left(e) =>
-            logger.error(s"Error while parsing state file: ${e.message}")
-            initialState
-          case Right(services) => services.groupBy(_.domain)
-        }
+        case Right(json) =>
+          json.as[Seq[Service]](Decoder.decodeSeq(Decoders.ServiceDecoder)) match {
+            case Left(e) =>
+              logger.error(s"Error while parsing state file: ${e.message}")
+              initialState
+            case Right(services) => services.groupBy(_.domain)
+          }
       }
     } getOrElse {
       initialState

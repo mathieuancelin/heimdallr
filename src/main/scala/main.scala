@@ -8,12 +8,12 @@ object Main {
       logger.info(s"Loading from $path")
       // Proxy.fromConfigPath("/Users/mathieuancelin/Desktop/reverse-proxy/src/main/resources/proxy.conf")
       Proxy.fromConfigPath(path) match {
-        case Left(e) => logger.error(s"Error while loading config file: $e")
+        case Left(e)      => logger.error(s"Error while loading config file: $e")
         case Right(proxy) => proxy.start().stopOnShutdown()
       }
     } getOrElse {
       val config = ProxyConfig(
-        statePath = Some("./state.json"),
+        // statePath = Some("./state.json"),
         services = Seq(
           Service(
             id = "UjvBYvkrqADUpq1N",
@@ -54,6 +54,14 @@ object Main {
                 enabled = true
               )
             )
+          ),
+          Service(
+            id = "ws-test",
+            domain = "ws.foo.bar",
+            targets = Seq(
+              Target("http://echo.websocket.org:80")
+            ),
+            publicPatterns = Seq("/*")
           )
         )
       )

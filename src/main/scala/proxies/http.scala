@@ -83,13 +83,13 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
             case _ => NoApiKey
           }
         } else if (value.startsWith("Bearer")) {
-          val token = value.replace("Bearer ", "")
+          val token    = value.replace("Bearer ", "")
           val JWTToken = JWT.decode(token)
-          val issuer = JWTToken.getIssuer
+          val issuer   = JWTToken.getIssuer
           service.apiKeys.find(apk => apk.enabled && apk.clientId == issuer) match {
             case Some(key) =>
               val algorithm = Algorithm.HMAC512(key.clientSecret)
-              val verifier = JWT.require(algorithm).withIssuer(JWTToken.getIssuer).build
+              val verifier  = JWT.require(algorithm).withIssuer(JWTToken.getIssuer).build
               verifier.verify(token)
               WithApiKey(key)
             case None => BadApiKey
@@ -162,15 +162,20 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
               request.header[UpgradeToWebSocket] match {
                 case Some(upgrade) => {
                   val flow = ActorFlow.actorRef(
-                    out => WebSocketProxyActor.props(proxyRequest.uri, materializer, out, http, headersIn)
+                    out =>
+                      WebSocketProxyActor.props(
+                        proxyRequest.uri.copy(scheme = if (target.scheme == "https") "wss" else "ws"),
+                        materializer,
+                        out,
+                        http,
+                        headersIn
+                    )
                   )
                   FastFuture.successful(upgrade.handleMessages(flow)).andThen {
                     case Success(resp) =>
                       logger.info(
-                        s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${
-                          request.uri.path
-                            .toString()
-                        } ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
+                        s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
+                          .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
                       )
                   }
                 }
@@ -178,10 +183,8 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
                   circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).andThen {
                     case Success(resp) =>
                       logger.info(
-                        s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${
-                          request.uri.path
-                            .toString()
-                        } ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
+                        s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
+                          .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
                       )
                   }
                 }
