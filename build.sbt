@@ -15,6 +15,7 @@ libraryDependencies ++= {
     "com.typesafe.akka"      %% "akka-http2-support" % akkaHttpVersion2,
     "com.typesafe.akka"      %% "akka-stream"        % akkaVersion,
     "com.typesafe.akka"      %% "akka-actor"         % akkaVersion,
+    "com.typesafe.akka"      %% "akka-stream-kafka"  % "0.18",
     "org.gnieh"              %% "diffson-circe"      % "2.2.4",
     "ch.qos.logback"         % "logback-classic"     % "1.2.3",
     "io.dropwizard.metrics"  % "metrics-core"        % "4.0.2",
@@ -24,7 +25,8 @@ libraryDependencies ++= {
     "io.circe"               %% "circe-parser"       % "0.9.0",
     "io.circe"               %% "circe-optics"       % "0.9.0",
     "org.mortbay.jetty.alpn" % "jetty-alpn-agent"    % "2.0.6",
-    "com.auth0"              % "java-jwt"            % "3.3.0"
+    "com.auth0"              % "java-jwt"            % "3.3.0",
+    "com.github.gphat"       %% "censorinus"         % "2.1.8"
   )
 }
 

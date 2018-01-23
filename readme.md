@@ -6,7 +6,16 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 
 - [ ] find a name for the project
 - [ ] admin API complete on another port. Add service to serve this api
+- [ ] api based on diff commands
 - [ ] write some docs in readme
+- [ ] built-in kafka support as commands input
+- [ ] built-in kafka support as logs output
+- [x] disable api from config
+- [x] config for state file (period for writes, enabled or not, etc ...)
+- [x] demo mode (--demo) or use config file ./proxy.conf
+- [x] remote config file
+- [x] remote state (with polling support from conf)
+- [ ] statsd support (include metrics in statsd actor for REST metrics)
 - [x] ProxyConfig object for Api integration
 - [x] withConfig(ProxyConfig)
 - [x] withConfigFrom(path)
