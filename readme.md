@@ -5,8 +5,8 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 ## Features
 
 - [ ] find a name for the project
-- [ ] admin API complete on another port. Add service to serve this api
-- [ ] api based on diff commands
+- [x] admin API complete on another port. Add service to serve this api
+- [x] api based on diff commands
 - [ ] write some docs in readme
 - [ ] built-in kafka support as commands input
 - [ ] built-in kafka support as logs output

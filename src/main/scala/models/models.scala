@@ -6,7 +6,6 @@ import akka.http.scaladsl.model.{HttpProtocol, HttpProtocols}
 import io.circe.Decoder.Result
 import io.circe._
 import io.circe.generic.semiauto._
-import models.Decoders.ServiceDecoder
 import store.Store
 import util.IdGenerator
 
@@ -134,24 +133,30 @@ case class ConfigError(message: String)
 trait Command {
   def command: String
   def modify(state: Seq[Service]): Seq[Service]
-  def applyModification(store: Store): Unit = store.modify(s => modify(s.values.flatten.toSeq).groupBy(_.domain))
+  def applyModification(store: Store): Json = {
+    store.modify(s => modify(s.values.flatten.toSeq).groupBy(_.domain))
+    Json.obj("result" -> Json.fromString("command applied"))
+  }
 }
 
 case class NothingCommand(command: String) extends Command {
   def modify(state: Seq[Service]): Seq[Service] = state
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-case class DumpStateCommand(command: String, serviceId: String, payload: Unit) extends Command {
+case class GetStateCommand(command: String) extends Command {
   def modify(state: Seq[Service]): Seq[Service] = state
+  override def applyModification(store: Store): Json = {
+    val seq = store.get().values.flatten.toSeq
+    Json.obj("state" -> Encoders.SeqOfServiceEncoder(seq))
+  }
 }
 
-case class DumpMetricsCommand(command: String, serviceId: String, payload: Unit) extends Command {
+case class GetMetricsCommand(command: String) extends Command {
   def modify(state: Seq[Service]): Seq[Service] = state
+  override def applyModification(store: Store): Json = {
+    Json.obj("metrics" -> Json.obj())
+  }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 case class LoadStateCommand(command: String, serviceId: String, services: Seq[Service]) extends Command {
   def modify(state: Seq[Service]): Seq[Service] = services
@@ -530,8 +535,8 @@ object Command {
   val RemoveServiceCommandDecoder: Decoder[RemoveServiceCommand]             = deriveDecoder[RemoveServiceCommand]
   val NothingCommandDecoder: Decoder[NothingCommand]                         = deriveDecoder[NothingCommand]
   val LoadStateCommandDecoder: Decoder[LoadStateCommand]                     = deriveDecoder[LoadStateCommand]
-  val DumpStateCommandDecoder: Decoder[DumpStateCommand]                     = deriveDecoder[DumpStateCommand]
-  val DumpMetricsCommandDecoder: Decoder[DumpMetricsCommand]                 = deriveDecoder[DumpMetricsCommand]
+  val GetStateCommandDecoder: Decoder[GetStateCommand]                       = deriveDecoder[GetStateCommand]
+  val GetMetricsCommandDecoder: Decoder[GetMetricsCommand]                   = deriveDecoder[GetMetricsCommand]
   val ChangeDomainCommandDecoder: Decoder[ChangeDomainCommand]               = deriveDecoder[ChangeDomainCommand]
   val AddTargetCommandDecoder: Decoder[AddTargetCommand]                     = deriveDecoder[AddTargetCommand]
   val RemoveTargetCommandDecoder: Decoder[RemoveTargetCommand]               = deriveDecoder[RemoveTargetCommand]
@@ -569,8 +574,8 @@ object Command {
       case "UpdateServiceCommand"          => UpdateServiceCommandDecoder.decodeJson(json)
       case "RemoveServiceCommand"          => RemoveServiceCommandDecoder.decodeJson(json)
       case "LoadStateCommand"              => LoadStateCommandDecoder.decodeJson(json)
-      case "DumpStateCommand"              => DumpStateCommandDecoder.decodeJson(json)
-      case "DumpMetricsCommand"            => DumpMetricsCommandDecoder.decodeJson(json)
+      case "GetStateCommand"               => GetStateCommandDecoder.decodeJson(json)
+      case "GetpMetricsCommand"            => GetMetricsCommandDecoder.decodeJson(json)
       case "ChangeDomainCommand"           => ChangeDomainCommandDecoder.decodeJson(json)
       case "AddTargetCommand"              => AddTargetCommandDecoder.decodeJson(json)
       case "RemoveTargetCommand"           => RemoveTargetCommandDecoder.decodeJson(json)

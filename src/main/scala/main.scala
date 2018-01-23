@@ -73,7 +73,6 @@ object Main {
       })
       .getOrElse {
         val path = "./proxy.conf"
-        logger.info(s"Loading configuration from file @ $path")
         Proxy.fromConfigPath(path) match {
           case Left(e)      => logger.error(s"Error while loading config file @ $path: $e")
           case Right(proxy) => proxy.start().stopOnShutdown()

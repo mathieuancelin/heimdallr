@@ -3,6 +3,7 @@ package api
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.util.FastFuture
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import com.codahale.metrics.MetricRegistry
@@ -34,14 +35,14 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
           io.circe.parser.parse(body) match {
             case Left(_) => BadRequest("Error while parsing body")
             case Right(json) =>
+              logger.info(s"received command: ${json.noSpaces}")
               Command.decode(json.hcursor.downField("command").as[String].getOrElse("none"), json) match {
                 case Left(_) => BadRequest("Error while parsing command")
-                case Right(command) =>
-                  command.applyModification(store)
-                  Ok(Json.obj("state" -> Json.fromString("command applied")))
+                case Right(command) => Ok(command.applyModification(store))
               }
           }
         }
+      case (_, path) => FastFuture.successful(NotFound(path.toString()))
     }
   }
 
