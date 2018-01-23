@@ -62,3 +62,7 @@ docker run -d -p "8081:80" emilevauge/whoami
 docker run -d -p "8082:80" emilevauge/whoami
 docker run -d -p "8083:80" emilevauge/whoami
 ```
+
+## Waiting for 
+
+* https://github.com/akka/akka-http/pull/1735

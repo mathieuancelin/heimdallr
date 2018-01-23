@@ -48,6 +48,7 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
   val authHeaderName = "Proxy-Authorization"
 
   def extractHost(request: HttpRequest): String = request.uri.toString() match {
+    case AbsoluteUri(_, hostPort, _) if hostPort.contains(":") => hostPort.split(":")(0)
     case AbsoluteUri(_, hostPort, _) => hostPort
     case _                           => request.header[Host].map(_.host.address()).getOrElse("--")
   }
