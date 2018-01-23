@@ -29,10 +29,10 @@ class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Serv
     extends Startable[Store]
     with Stoppable[Store] {
 
-  private implicit val system   = ActorSystem()
-  private implicit val executor = system.dispatcher
+  private implicit val system       = ActorSystem()
+  private implicit val executor     = system.dispatcher
   private implicit val materializer = ActorMaterializer.create(system)
-  private implicit val http = Http(system)
+  private implicit val http         = Http(system)
 
   private val actor = system.actorOf(FileWriter.props())
 
@@ -48,22 +48,26 @@ class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Serv
       } else {
         val config = stateConfig.get.local
         new AtomicReference[Map[String, Seq[Service]]](
-          config.map(c => new File(c.path)).filter(_.exists()).map { file =>
-            io.circe.parser.parse(new String(Files.readAllBytes(file.toPath))) match {
-              case Left(e) =>
-                logger.error(s"Error while parsing state file: ${e.message}")
-                initialState
-              case Right(json) =>
-                json.as[Seq[Service]](Decoder.decodeSeq(Decoders.ServiceDecoder)) match {
+          config
+            .map(c => new File(c.path))
+            .filter(_.exists())
+            .map {
+              file =>
+                io.circe.parser.parse(new String(Files.readAllBytes(file.toPath))) match {
                   case Left(e) =>
                     logger.error(s"Error while parsing state file: ${e.message}")
                     initialState
-                  case Right(services) =>
-                    logger.info(s"Loading state from ${file.toPath.toString}")
-                    services.groupBy(_.domain)
+                  case Right(json) =>
+                    json.as[Seq[Service]](Decoder.decodeSeq(Decoders.ServiceDecoder)) match {
+                      case Left(e) =>
+                        logger.error(s"Error while parsing state file: ${e.message}")
+                        initialState
+                      case Right(services) =>
+                        logger.info(s"Loading state from ${file.toPath.toString}")
+                        services.groupBy(_.domain)
+                    }
                 }
-            }
-          } getOrElse {
+            } getOrElse {
             initialState
           }
         )
@@ -75,28 +79,33 @@ class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Serv
 
   private def fetchRemoteState(config: RemoteStateConfig): Future[Map[String, Seq[Service]]] = {
     val headers: List[HttpHeader] = config.headers.toList.map(t => RawHeader(t._1, t._2))
-    http.singleRequest(HttpRequest(
-      uri = Uri(config.url),
-      method = HttpMethods.GET,
-      headers = headers
-    )).flatMap { response =>
-      response.entity.dataBytes.runFold(ByteString.empty)(_ ++ _)
-    }.flatMap { bs =>
-      val body = bs.utf8String
-      io.circe.parser.parse(body) match {
-        case Left(e) =>
-          logger.error(s"Error while parsing state from http body: ${e.message}")
-          FastFuture.failed(e)
-        case Right(json) =>
-          json.as[Seq[Service]](Decoder.decodeSeq(Decoders.ServiceDecoder)) match {
-            case Left(e) =>
-              logger.error(s"Error while parsing state from http body: ${e.message}")
-              FastFuture.failed(e)
-            case Right(services) =>
-              FastFuture.successful(services.groupBy(_.domain))
-          }
+    http
+      .singleRequest(
+        HttpRequest(
+          uri = Uri(config.url),
+          method = HttpMethods.GET,
+          headers = headers
+        )
+      )
+      .flatMap { response =>
+        response.entity.dataBytes.runFold(ByteString.empty)(_ ++ _)
       }
-    }
+      .flatMap { bs =>
+        val body = bs.utf8String
+        io.circe.parser.parse(body) match {
+          case Left(e) =>
+            logger.error(s"Error while parsing state from http body: ${e.message}")
+            FastFuture.failed(e)
+          case Right(json) =>
+            json.as[Seq[Service]](Decoder.decodeSeq(Decoders.ServiceDecoder)) match {
+              case Left(e) =>
+                logger.error(s"Error while parsing state from http body: ${e.message}")
+                FastFuture.failed(e)
+              case Right(services) =>
+                FastFuture.successful(services.groupBy(_.domain))
+            }
+        }
+      }
   }
 
   def modify(f: Map[String, Seq[Service]] => Map[String, Seq[Service]]): Map[String, Seq[Service]] = {

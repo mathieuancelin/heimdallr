@@ -2,9 +2,11 @@ package api
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
+import akka.util.ByteString
 import com.codahale.metrics.MetricRegistry
+import io.circe.Json
 import models._
 import org.slf4j.LoggerFactory
 import store.Store
@@ -25,36 +27,22 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
   lazy val logger = LoggerFactory.getLogger("proxy")
 
   def handler(request: HttpRequest): Future[HttpResponse] = {
-    Future.successful(BadRequest("Not Implemented Yet !"))
-    //request.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map(_.utf8String).map { body =>
-    //  parse(body) match {
-    //    case Left(e) => BadRequest(e.message)
-    //    case Right(json) =>
-    //      json.as(Command.decoder) match {
-    //        case Left(e)                               => BadRequest(e.message)
-    //        case Right(Command("ADD", domain, target)) =>
-    //          //store.modify { services =>
-    //          //  services.get(domain) match {
-    //          //    case Some(seq) => services + (domain -> (seq :+ Target(target)))
-    //          //    case None      => services + (domain -> Seq(Target(target)))
-    //          //  }
-    //          //}
-    //          ???
-    //          Ok(Json.obj("done" -> Json.fromBoolean(true)))
-    //        case Right(Command("REM", domain, target)) =>
-    //          store.modify { services =>
-    //            // services.get(domain) match {
-    //            //   case Some(Service(_, _, seq, _)) if seq.size == 1 && seq(0).url == target => services - domain
-    //            //   case Some(Service(_, _, seq, _))                                          => services + (domain -> seq.filterNot(_ == Target(target)))
-    //            //   case _                                                  => services
-    //            // }
-    //            ???
-    //          }
-    //          Ok(Json.obj("done" -> Json.fromBoolean(true)))
-    //        case _ => BadRequest("Unrecognized command")
-    //      }
-    //  }
-    //}
+    (request.method, request.uri.path) match {
+      case (HttpMethods.POST, Uri.Path("/command")) =>
+        request.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { bs =>
+          val body = bs.utf8String
+          io.circe.parser.parse(body) match {
+            case Left(_) => BadRequest("Error while parsing body")
+            case Right(json) =>
+              Command.decode(json.hcursor.downField("command").as[String].getOrElse("none"), json) match {
+                case Left(_) => BadRequest("Error while parsing command")
+                case Right(command) =>
+                  command.applyModification(store)
+                  Ok(Json.obj("state" -> Json.fromString("command applied")))
+              }
+          }
+        }
+    }
   }
 
   def start(): Stoppable[AdminApi] = {
@@ -72,5 +60,4 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
     http.shutdownAllConnectionPools()
     system.terminate()
   }
-
 }

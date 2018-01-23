@@ -20,7 +20,7 @@ object Main {
           additionalHeaders = Map(
             "Authorization" -> "basic 1234"
           ),
-          publicPatterns = Seq("/*")
+          publicPatterns = Set("/*")
         ),
         Service(
           id = "matching-root-test",
@@ -32,7 +32,7 @@ object Main {
           additionalHeaders = Map(
             "Worked" -> "Yeah"
           ),
-          publicPatterns = Seq("/*")
+          publicPatterns = Set("/*")
         ),
         Service(
           id = "admin-api",
@@ -55,7 +55,7 @@ object Main {
           targets = Seq(
             Target("http://echo.websocket.org:80")
           ),
-          publicPatterns = Seq("/*")
+          publicPatterns = Set("/*")
         )
       )
     )
