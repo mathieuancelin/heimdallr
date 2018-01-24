@@ -56,6 +56,7 @@ case class HttpConfig(
     listenOn: String = "0.0.0.0",
     keyStoreType: String = "PKCS12",
     certPath: Option[String] = None,
+    keyPath: Option[String]  = None,
     certPass: Option[String] = None
 )
 case class ApiConfig(
@@ -64,6 +65,7 @@ case class ApiConfig(
     listenOn: String = "127.0.0.1",
     keyStoreType: String = "PKCS12",
     certPath: Option[String] = None,
+    keyPath: Option[String]  = None,
     certPass: Option[String] = None,
     enabled: Boolean = true
 )

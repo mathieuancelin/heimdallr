@@ -37,7 +37,7 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
             case Right(json) =>
               logger.info(s"received command: ${json.noSpaces}")
               Command.decode(json.hcursor.downField("command").as[String].getOrElse("none"), json) match {
-                case Left(_) => BadRequest("Error while parsing command")
+                case Left(_)        => BadRequest("Error while parsing command")
                 case Right(command) => Ok(command.applyModification(store))
               }
           }
@@ -50,7 +50,7 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
     logger.info(s"Listening for api commands on http://${config.api.listenOn}:${config.api.httpPort}")
     http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpPort)
     config.api.certPath.foreach { path =>
-      val httpsContext = HttpsSupport.context(path, config.api.certPass.get, config.api.keyStoreType)
+      val httpsContext = HttpsSupport.context(path, config.api.keyPath, config.api.certPass.get, config.api.keyStoreType)
       logger.info(s"Listening for admin commands on https://${config.api.listenOn}:${config.api.httpsPort}")
       http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpsPort, connectionContext = httpsContext)
     }

@@ -26,7 +26,10 @@ libraryDependencies ++= {
     "io.circe"               %% "circe-optics"       % "0.9.0",
     "org.mortbay.jetty.alpn" % "jetty-alpn-agent"    % "2.0.6",
     "com.auth0"              % "java-jwt"            % "3.3.0",
-    "com.github.gphat"       %% "censorinus"         % "2.1.8"
+    "com.github.gphat"       %% "censorinus"         % "2.1.8",
+    "org.bouncycastle"       % "bcprov-jdk15on"      % "1.59",
+    "org.bouncycastle"       % "bcpkix-jdk15on"      % "1.59",
+    "org.bouncycastle"       % "bctls-jdk15on"       % "1.59"
   )
 }
 

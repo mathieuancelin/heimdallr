@@ -49,8 +49,8 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
 
   def extractHost(request: HttpRequest): String = request.uri.toString() match {
     case AbsoluteUri(_, hostPort, _) if hostPort.contains(":") => hostPort.split(":")(0)
-    case AbsoluteUri(_, hostPort, _) => hostPort
-    case _                           => request.header[Host].map(_.host.address()).getOrElse("--")
+    case AbsoluteUri(_, hostPort, _)                           => hostPort
+    case _                                                     => request.header[Host].map(_.host.address()).getOrElse("--")
   }
 
   def findService(host: String, path: Uri.Path, headers: Map[String, HttpHeader]): Option[Service] = {
@@ -235,7 +235,7 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
     logger.info(s"Listening for http call on http://${config.http.listenOn}:${config.http.httpPort}")
     http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpPort)
     config.http.certPath.foreach { path =>
-      val httpsContext = HttpsSupport.context(path, config.http.certPass.get, config.http.keyStoreType)
+      val httpsContext = HttpsSupport.context(path, config.http.keyPath, config.http.certPass.get, config.http.keyStoreType)
       logger.info(s"Listening for http calls on https://${config.http.listenOn}:${config.http.httpsPort}")
       http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpsPort, connectionContext = httpsContext)
     }

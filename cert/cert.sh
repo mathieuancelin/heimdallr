@@ -1,5 +1,8 @@
 export PW="ouhUpHgmowd2xXz3"
 
+rm -f ./foobar*
+rm -f ./foo.bar*
+
 # Generate Certificate Authority to sign certificate
 keytool -genkeypair -v \
   -alias foobar \
@@ -51,6 +54,18 @@ keytool -gencert -v \
   -keystore foobar.jks \
   -infile foo.bar.csr \
   -outfile foo.bar.crt \
+  -ext KeyUsage:critical="digitalSignature,keyEncipherment" \
+  -ext EKU="serverAuth" \
+  -ext SAN="DNS:foo.bar" \
+  -rfc
+
+keytool -gencert -v \
+  -alias foobar \
+  -keypass:env PW \
+  -storepass:env PW \
+  -keystore foobar.jks \
+  -infile foo.bar.csr \
+  -outfile foo.bar-cert.pem \
   -ext KeyUsage:critical="digitalSignature,keyEncipherment" \
   -ext EKU="serverAuth" \
   -ext SAN="DNS:foo.bar" \
@@ -108,5 +123,12 @@ openssl pkcs12 \
   -in foo.bar.p12 \
   -out foo.bar.key
 
-openssl pkcs12 -in foo.bar.p12 -out foo.bar.pem -passin env:PW -passout env:PW
-# openssl pkcs12 -in foo.bar.p12 -out foo.bar.pem -passin pass:uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW -passout pass:uW8WlTlANX0WxAo1PvDnQBGUXB1UeQrVvitD22yLiJxkxtJLz3gFzcVoKu25GJLW
+openssl pkcs12 \
+  -nocerts \
+  -nodes \
+  -passout env:PW \
+  -passin env:PW \
+  -in foo.bar.p12 \
+  -out foo.bar-key.pem
+
+# openssl pkcs12 -in foo.bar.p12 -out foo.bar.pem -passin env:PW -passout env:PW

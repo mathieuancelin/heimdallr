@@ -10,6 +10,7 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [ ] write some docs in readme
 - [ ] built-in kafka support as commands input
 - [ ] built-in kafka support as logs output
+- [ ] dynamic TLS
 - [x] disable api from config
 - [x] config for state file (period for writes, enabled or not, etc ...)
 - [x] demo mode (--demo) or use config file ./proxy.conf

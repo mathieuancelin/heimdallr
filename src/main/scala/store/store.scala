@@ -51,22 +51,21 @@ class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Serv
           config
             .map(c => new File(c.path))
             .filter(_.exists())
-            .map {
-              file =>
-                io.circe.parser.parse(new String(Files.readAllBytes(file.toPath))) match {
-                  case Left(e) =>
-                    logger.error(s"Error while parsing state file: ${e.message}")
-                    initialState
-                  case Right(json) =>
-                    json.as[Seq[Service]](Decoder.decodeSeq(Decoders.ServiceDecoder)) match {
-                      case Left(e) =>
-                        logger.error(s"Error while parsing state file: ${e.message}")
-                        initialState
-                      case Right(services) =>
-                        logger.info(s"Loading state from ${file.toPath.toString}")
-                        services.groupBy(_.domain)
-                    }
-                }
+            .map { file =>
+              io.circe.parser.parse(new String(Files.readAllBytes(file.toPath))) match {
+                case Left(e) =>
+                  logger.error(s"Error while parsing state file: ${e.message}")
+                  initialState
+                case Right(json) =>
+                  json.as[Seq[Service]](Decoder.decodeSeq(Decoders.ServiceDecoder)) match {
+                    case Left(e) =>
+                      logger.error(s"Error while parsing state file: ${e.message}")
+                      initialState
+                    case Right(services) =>
+                      logger.info(s"Loading state from ${file.toPath.toString}")
+                      services.groupBy(_.domain)
+                  }
+              }
             } getOrElse {
             initialState
           }

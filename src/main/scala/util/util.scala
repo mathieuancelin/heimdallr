@@ -1,10 +1,13 @@
 package util
 
 import java.io.{File, FileInputStream, InputStream}
-import java.security.{KeyStore, SecureRandom}
+import java.net.Socket
+import java.security.cert.X509Certificate
+import java.security._
 import java.util.Optional
 import java.util.concurrent.atomic.AtomicLong
-import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
+import java.util.regex.Pattern
+import javax.net.ssl._
 
 import akka.actor.{
   Actor,
@@ -22,19 +25,93 @@ import akka.http.scaladsl.{ConnectionContext, HttpsConnectionContext}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.{Materializer, OverflowStrategy}
 import io.circe.Json
+import org.slf4j.LoggerFactory
+import ssl.PemReader
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Random, Success}
 
+class DynamicKeyManager(manager: X509KeyManager) extends X509KeyManager {
+
+  lazy val logger = LoggerFactory.getLogger("proxy")
+
+  logger.info("DynamicKeyManager")
+
+  override def getCertificateChain(alias: String): Array[X509Certificate] = {
+    logger.info(s"getCertificateChain($alias)")
+    manager.getCertificateChain(alias)
+  }
+
+  override def chooseServerAlias(keyType: String, issuers: Array[Principal], socket: Socket): String = {
+    logger.info(s"chooseServerAlias($keyType, ${issuers.mkString("[", ",", "]")}, $socket)")
+    manager.chooseServerAlias(keyType, issuers, socket)
+  }
+
+  override def getClientAliases(keyType: String, issuers: Array[Principal]): Array[String] = {
+    logger.info(s"getClientAliases($keyType, ${issuers.mkString("[", ",", "]")})")
+    manager.getClientAliases(keyType, issuers)
+  }
+
+  override def chooseClientAlias(keyType: Array[String], issuers: Array[Principal], socket: Socket): String = {
+    logger.info(s"chooseClientAlias($keyType, ${issuers.mkString("[", ",", "]")}, $socket)")
+    manager.chooseClientAlias(keyType, issuers, socket)
+  }
+
+  override def getServerAliases(keyTypes: String, issuers: Array[Principal]): Array[String] = {
+    logger.info(s"getServerAliases($keyTypes, ${issuers.mkString("[", ",", "]")})")
+    manager.getServerAliases(keyTypes, issuers)
+  }
+
+  override def getPrivateKey(alias: String): PrivateKey = {
+    logger.info(s"getPrivateKey($alias)")
+    manager.getPrivateKey(alias)
+  }
+}
+
+class DynamicTrustManager(manager: X509TrustManager) extends X509TrustManager {
+
+  lazy val logger = LoggerFactory.getLogger("proxy")
+
+  logger.info("DynamicTrustManager")
+
+  override def checkServerTrusted(x509Certificates: Array[X509Certificate], s: String): Unit = {
+    logger.info(s"checkServerTrusted($x509Certificates, $s)")
+    manager.checkServerTrusted(x509Certificates, s)
+  }
+
+  override def checkClientTrusted(x509Certificates: Array[X509Certificate], s: String): Unit = {
+    logger.info(s"checkClientTrusted($x509Certificates, $s)")
+    manager.checkServerTrusted(x509Certificates, s)
+  }
+
+  override def getAcceptedIssuers: Array[X509Certificate] = {
+    logger.info(s"getAcceptedIssuers()")
+    manager.getAcceptedIssuers()
+  }
+}
+
 object HttpsSupport {
-  def context(certificatePath: String, pass: String, keyStoreType: String = "PKCS12"): HttpsConnectionContext = {
+
+  import org.bouncycastle.jce.provider.BouncyCastleProvider
+  import java.security.Security
+
+  Security.addProvider(new BouncyCastleProvider)
+
+  def context(certificatePath: String, keyPath: Option[String], pass: String, keyStoreType: String): HttpsConnectionContext = {
+
     val password: Array[Char] = pass.toCharArray
 
-    val ks: KeyStore          = KeyStore.getInstance(keyStoreType)
-    val keystore: InputStream = new FileInputStream(new File(certificatePath))
-
-    require(keystore != null, "Keystore required!")
-    ks.load(keystore, password)
+    val ks: KeyStore = if (keyStoreType == "PEM") {
+      val cert = PemReader.certificateFromCrt(certificatePath)
+      val keypair = PemReader.keyPairFromPem(keyPath.get)
+      PemReader.loadKeystore("private-key", keypair, cert, pass)
+    } else {
+      val ks: KeyStore          = KeyStore.getInstance(keyStoreType)
+      val keystore: InputStream = new FileInputStream(new File(certificatePath))
+      require(keystore != null, "Keystore required!")
+      ks.load(keystore, password)
+      ks
+    }
 
     val keyManagerFactory: KeyManagerFactory = KeyManagerFactory.getInstance("SunX509")
     keyManagerFactory.init(ks, password)
@@ -47,6 +124,99 @@ object HttpsSupport {
     ConnectionContext.https(sslContext)
   }
 }
+
+/*
+
+https://jcalcote.wordpress.com/2010/06/22/managing-a-dynamic-java-trust-store/
+http://codyaray.com/2013/04/java-ssl-with-multiple-keystores
+https://gist.github.com/xkr47/457fd13c45bd84764fcd80151f19ffa3
+https://gist.github.com/dain/29ce5c135796c007f9ec88e82ab21822
+
+class ReloadableX509TrustManager
+    implements X509TrustManager {
+  private final String trustStorePath;
+  private X509TrustManager trustManager;
+  private List tempCertList
+      = new List();
+
+  public ReloadableX509TrustManager(String tspath)
+      throws Exception {
+    this.trustStorePath = tspath;
+    reloadTrustManager();
+  }
+
+  @Override
+  public void checkClientTrusted(X509Certificate[] chain,
+      String authType) throws CertificateException {
+    trustManager.checkClientTrusted(chain, authType);
+  }
+
+  @Override
+  public void checkServerTrusted(X509Certificate[] chain,
+      String authType) throws CertificateException {
+    try {
+      trustManager.checkServerTrusted(chain, authType);
+    } catch (CertificateException cx) {
+      addServerCertAndReload(chain[0], true);
+      trustManager.checkServerTrusted(chain, authType);
+    }
+  }
+
+  @Override
+  public X509Certificate[] getAcceptedIssuers() {
+    X509Certificate[] issuers
+        = trustManager.getAcceptedIssuers();
+    return issuers;
+  }
+
+  private void reloadTrustManager() throws Exception {
+
+    // load keystore from specified cert store (or default)
+    KeyStore ts = KeyStore.getInstance(
+	    KeyStore.getDefaultType());
+    InputStream in = new FileInputStream(trustStorePath);
+    try { ts.load(in, null); }
+    finally { in.close(); }
+
+    // add all temporary certs to KeyStore (ts)
+    for (Certificate cert : tempCertList) {
+      ts.setCertificateEntry(UUID.randomUUID(), cert);
+    }
+
+    // initialize a new TMF with the ts we just loaded
+    TrustManagerFactory tmf
+	    = TrustManagerFactory.getInstance(
+            TrustManagerFactory.getDefaultAlgorithm());
+    tmf.init(ts);
+
+    // acquire X509 trust manager from factory
+    TrustManager tms[] = tmf.getTrustManagers();
+    for (int i = 0; i < tms.length; i++) {
+      if (tms[i] instanceof X509TrustManager) {
+        trustManager = (X509TrustManager)tms[i];
+        return;
+      }
+    }
+
+    throw new NoSuchAlgorithmException(
+        "No X509TrustManager in TrustManagerFactory");
+  }
+
+  private void addServerCertAndReload(Certificate cert,
+      boolean permanent) {
+    try {
+      if (permanent) {
+        // import the cert into file trust store
+        // Google "java keytool source" or just ...
+        Runtime.getRuntime().exec("keytool -importcert ...");
+      } else {
+        tempCertList.add(cert);
+      }
+      reloadTrustManager();
+    } catch (Exception ex) { /* ... */ }
+  }
+}
+ */
 
 object Retry {
 
@@ -121,8 +291,6 @@ object Implicits {
     }
   }
 }
-
-import java.util.regex.Pattern
 
 case class Regex(originalPattern: String, compiledPattern: Pattern) {
   def matches(value: String): Boolean = compiledPattern.matcher(value).matches()
