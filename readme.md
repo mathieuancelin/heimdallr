@@ -39,6 +39,26 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [x] pass --proxy.config=???
 - [x] shutdown hook in main
 
+## Missing from otoroshi
+
+* [x] service enabled
+* [ ] private mode
+* [ ] maintenance mode
+* [ ] build mode
+* [ ] force https mode
+* [ ] secure mode mode
+* [ ] pass apikey by custom headers
+* [ ] header name custom values from config
+* [ ] api quotas
+* [ ] api throttling
+* [ ] global throttling
+* [ ] canary mode
+* [ ] custom templates
+* [ ] push api usage back
+* [ ] alerts
+* [ ] push alerts back
+
+
 ## Helpers
 
 for http2

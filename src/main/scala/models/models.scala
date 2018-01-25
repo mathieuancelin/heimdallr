@@ -29,6 +29,7 @@ case class ApiKey(clientId: String, clientSecret: String, name: String, enabled:
 
 case class Service(id: String,
                    domain: String,
+                   enabled: Boolean = true,
                    targets: Seq[Target] = Seq.empty,
                    apiKeys: Seq[ApiKey] = Seq.empty,
                    clientConfig: ClientConfig = ClientConfig(),
@@ -56,7 +57,7 @@ case class HttpConfig(
     listenOn: String = "0.0.0.0",
     keyStoreType: String = "PKCS12",
     certPath: Option[String] = None,
-    keyPath: Option[String]  = None,
+    keyPath: Option[String] = None,
     certPass: Option[String] = None
 )
 case class ApiConfig(
@@ -65,7 +66,7 @@ case class ApiConfig(
     listenOn: String = "127.0.0.1",
     keyStoreType: String = "PKCS12",
     certPath: Option[String] = None,
-    keyPath: Option[String]  = None,
+    keyPath: Option[String] = None,
     certPass: Option[String] = None,
     enabled: Boolean = true
 )

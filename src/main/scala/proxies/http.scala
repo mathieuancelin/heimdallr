@@ -56,22 +56,39 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
   def findService(host: String, path: Uri.Path, headers: Map[String, HttpHeader]): Option[Service] = {
     val uri = path.toString()
     store.get().get(host).flatMap { services =>
-      // TODO : optimize this part (costs 100 hits/sec)
-      services.sortWith((a, _) => a.root.isDefined).filter { s =>
+      val sortedServices = services.filter(_.enabled).sortWith(
+        (a, _) =>
+          if (a.root.isDefined && a.matchingHeaders.nonEmpty) true
+          else if (a.root.isEmpty && a.matchingHeaders.nonEmpty) true
+          else a.root.isDefined
+      )
+      var found: Option[Service] = None
+      var index                  = 0
+      while (found.isEmpty && index < sortedServices.size) {
+        val s = sortedServices(index)
+        index = index + 1
         if (s.root.isDefined) {
-          uri.startsWith(s.root.get)
+          if (uri.startsWith(s.root.get)) {
+            if (s.matchingHeaders.nonEmpty) {
+              if (s.matchingHeaders.toSeq.forall(t => headers.get(t._1).exists(_.value() == t._2))) {
+                found = Some(s)
+              }
+            } else {
+              found = Some(s)
+            }
+          }
         } else {
-          true
+          if (s.matchingHeaders.nonEmpty) {
+            if (s.matchingHeaders.toSeq.forall(t => headers.get(t._1).exists(_.value() == t._2))) {
+              found = Some(s)
+            }
+          } else {
+            found = Some(s)
+          }
         }
-      } filter { s =>
-        if (s.matchingHeaders.nonEmpty) {
-          s.matchingHeaders.toSeq.map(t => headers.get(t._1).exists(_.value() == t._2)).find(_ == false).isEmpty
-        } else {
-          true
-        }
-      } headOption
+      }
+      found
     }
-    // store.get().get(host).flatMap(_.lastOption)
   }
 
   def extractApiKey(request: HttpRequest, service: Service): WithApiKeyOrNot = {
@@ -181,19 +198,23 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
                   )
                   FastFuture.successful(upgrade.handleMessages(flow)).andThen {
                     case Success(resp) =>
-                      logger.info(
-                        s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
-                          .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
-                      )
+                      if (logger.isInfoEnabled) {
+                        logger.info(
+                          s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
+                            .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
+                        )
+                      }
                   }
                 }
                 case None => {
                   circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).andThen {
                     case Success(resp) =>
-                      logger.info(
-                        s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
-                          .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
-                      )
+                      if (logger.isInfoEnabled) {
+                        logger.info(
+                          s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
+                            .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
+                        )
+                      }
                   }
                 }
               }
@@ -235,7 +256,8 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
     logger.info(s"Listening for http call on http://${config.http.listenOn}:${config.http.httpPort}")
     http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpPort)
     config.http.certPath.foreach { path =>
-      val httpsContext = HttpsSupport.context(path, config.http.keyPath, config.http.certPass.get, config.http.keyStoreType)
+      val httpsContext =
+        HttpsSupport.context(path, config.http.keyPath, config.http.certPass.get, config.http.keyStoreType)
       logger.info(s"Listening for http calls on https://${config.http.listenOn}:${config.http.httpsPort}")
       http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpsPort, connectionContext = httpsContext)
     }

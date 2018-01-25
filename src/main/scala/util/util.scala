@@ -97,12 +97,15 @@ object HttpsSupport {
 
   Security.addProvider(new BouncyCastleProvider)
 
-  def context(certificatePath: String, keyPath: Option[String], pass: String, keyStoreType: String): HttpsConnectionContext = {
+  def context(certificatePath: String,
+              keyPath: Option[String],
+              pass: String,
+              keyStoreType: String): HttpsConnectionContext = {
 
     val password: Array[Char] = pass.toCharArray
 
     val ks: KeyStore = if (keyStoreType == "PEM") {
-      val cert = PemReader.certificateFromCrt(certificatePath)
+      val cert    = PemReader.certificateFromCrt(certificatePath)
       val keypair = PemReader.keyPairFromPem(keyPath.get)
       PemReader.loadKeystore("private-key", keypair, cert, pass)
     } else {
