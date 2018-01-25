@@ -38,6 +38,11 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [x] pass --proxy.config=???
 - [x] pass --proxy.config=???
 - [x] shutdown hook in main
+- [ ] handle service access preconditions with pluggable podules
+- [ ] handle service access with pluggable modules (apikey + throttling, global throtthling, ip filtering)
+- [ ] handle headers out manipulation with pluggable modules
+- [ ] handle errors rendering with pluggable modules
+- [ ] handle target set choice with pluggable modules
 
 ## Missing from otoroshi
 
