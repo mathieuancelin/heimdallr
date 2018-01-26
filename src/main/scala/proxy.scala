@@ -7,7 +7,7 @@ import akka.http.scaladsl.model.{HttpMethods, HttpRequest, Uri}
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import api.AdminApi
-import ch.qos.logback.classic.LoggerContext
+import ch.qos.logback.classic.{Level, LoggerContext}
 import ch.qos.logback.classic.joran.JoranConfigurator
 import com.codahale.metrics.MetricRegistry
 import com.codahale.metrics.jmx.JmxReporter
@@ -36,8 +36,8 @@ class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[Proxy
     .build()
 
   private def setupLoggers(): Unit = {
+    val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
     config.logConfigPath.foreach { path =>
-      val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
       loggerContext.reset()
       val configurator = new JoranConfigurator
       val configStream = new FileInputStream(new File(path))
@@ -45,6 +45,8 @@ class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[Proxy
       configurator.doConfigure(configStream)
       configStream.close()
     }
+    loggerContext.getLogger("heimdallr").setLevel(Level.valueOf(config.loggers.level))
+    loggerContext.getLogger("heimdallr-ws").setLevel(Level.valueOf(config.loggers.wsLevel))
   }
 
   override def start(): Stoppable[Proxy] = {

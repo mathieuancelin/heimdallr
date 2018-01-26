@@ -34,8 +34,6 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metri
 
   lazy val logger = LoggerFactory.getLogger("heimdallr")
 
-  val decoder = Base64.getUrlDecoder
-
   val AbsoluteUri = """(?is)^(https?)://([^/]+)(/.*|$)""".r
 
   val counter = new AtomicInteger(0)
@@ -102,7 +100,8 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metri
   }
 
   def handler(request: HttpRequest): Future[HttpResponse] = {
-    val start     = metrics.timer("proxy-request").time()
+    val start     = System.currentTimeMillis()
+    val startCtx  = metrics.timer("proxy-request").time()
     val requestId = UUID.randomUUID().toString
     val host      = extractHost(request)
     val fu = findService(host, request.uri.path, request.headers.groupBy(_.name()).mapValues(_.last)) match {
@@ -128,16 +127,16 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metri
                     resetTimeout = service.clientConfig.resetTimeout
                 )
               )
-              val headersIn: Seq[HttpHeader] =
-              request.headers.filterNot(t => t.name() == "Host" || t.name() == authHeaderName) ++
-              HeadersTransformationModule.transform(modules.HeadersTransformationModules,
-                                                    requestId,
-                                                    host,
-                                                    service,
-                                                    target,
-                                                    request,
-                                                    waon,
-                                                    request.headers) :+
+              val headersWithoutHost = request.headers.filterNot(t => t.name() == "Host")
+              val headersIn: Seq[HttpHeader] = headersWithoutHost ++
+              HeadersInTransformationModule.transform(modules.HeadersInTransformationModules,
+                                                      requestId,
+                                                      host,
+                                                      service,
+                                                      target,
+                                                      request,
+                                                      waon,
+                                                      headersWithoutHost.toList) :+
               Host(target.host)
               val proxyRequest = request.copy(
                 uri = request.uri.copy(
@@ -172,7 +171,23 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metri
                   }
                 }
                 case None => {
-                  circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).andThen {
+                  val callStart = System.currentTimeMillis()
+                  circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).map { resp =>
+                    resp.copy(
+                      headers = HeadersOutTransformationModule.transform(
+                        modules.HeadersOutTransformationModules,
+                        requestId,
+                        host,
+                        service,
+                        target,
+                        request,
+                        waon,
+                        System.currentTimeMillis() - start,
+                        System.currentTimeMillis() - callStart,
+                        resp.headers.toList
+                      )
+                    )
+                  } andThen {
                     case Success(resp) =>
                       if (logger.isInfoEnabled) {
                         logger.info(
@@ -245,7 +260,7 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metri
           ErrorRendererModule.render(modules.ErrorRendererModules, requestId, 404, "No ApiKey provided", None, request)
         )
     }
-    fu.andThen { case _ => start.close() }
+    fu.andThen { case _ => startCtx.close() }
   }
 
   def start(): Stoppable[HttpProxy] = {

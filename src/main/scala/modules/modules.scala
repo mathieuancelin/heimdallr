@@ -17,7 +17,8 @@ object Modules {
     Seq(
       new DefaultPreconditionModule(),
       new DefaultServiceAccessModule(),
-      new DefaultHeadersTransformationModule(),
+      new DefaultHeadersInTransformationModule(),
+      new DefaultHeadersOutTransformationModule(),
       new DefaultErrorRendererModule(),
       new DefaultTargetSetChooserModule(),
     )
@@ -94,9 +95,11 @@ class DefaultServiceAccessModule extends ServiceAccessModule {
   }
 }
 
-class DefaultHeadersTransformationModule extends HeadersTransformationModule {
+class DefaultHeadersInTransformationModule extends HeadersInTransformationModule {
 
-  override def id: String = "DefaultHeadersTransformationModule"
+  val authHeaderName = "Proxy-Authorization"
+
+  override def id: String = "DefaultHeadersInTransformationModule"
 
   override def transform(reqId: String,
                          host: String,
@@ -104,11 +107,31 @@ class DefaultHeadersTransformationModule extends HeadersTransformationModule {
                          target: Target,
                          request: HttpRequest,
                          waon: WithApiKeyOrNot,
-                         headers: Seq[HttpHeader]): Seq[HttpHeader] = {
-    service.additionalHeaders.toSeq.map(t => RawHeader(t._1, t._2)) :+
+                         headers: List[HttpHeader]): List[HttpHeader] = {
+    headers.filterNot(_.name() == authHeaderName) ++
+    service.additionalHeaders.toList.map(t => RawHeader(t._1, t._2)) :+
     RawHeader("X-Request-Id", reqId) :+
     RawHeader("X-Fowarded-Host", host) :+
     RawHeader("X-Fowarded-Scheme", request.uri.scheme)
+  }
+}
+
+class DefaultHeadersOutTransformationModule extends HeadersOutTransformationModule {
+
+  override def id: String = "DefaultHeadersOutTransformationModule"
+
+  override def transform(reqId: String,
+                         host: String,
+                         service: Service,
+                         target: Target,
+                         request: HttpRequest,
+                         waon: WithApiKeyOrNot,
+                         proxyLatency: Long,
+                         targetLatency: Long,
+                         headers: List[HttpHeader]): List[HttpHeader] = {
+    headers :+
+    RawHeader("X-Proxy-Latency", proxyLatency.toString) :+
+    RawHeader("X-Target-Latency", targetLatency.toString)
   }
 }
 

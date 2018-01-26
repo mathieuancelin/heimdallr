@@ -58,26 +58,56 @@ object ServiceAccessModule {
 }
 
 // can handle headers additions, like JWT header, request id, API quotas, etc ...
-trait HeadersTransformationModule extends Module {
+trait HeadersInTransformationModule extends Module {
   def transform(reqId: String,
                 host: String,
                 service: Service,
                 target: Target,
                 request: HttpRequest,
                 waon: WithApiKeyOrNot,
-                headers: Seq[HttpHeader]): Seq[HttpHeader]
+                headers: List[HttpHeader]): List[HttpHeader]
 }
-object HeadersTransformationModule {
-  def transform(modules: Seq[HeadersTransformationModule],
+object HeadersInTransformationModule {
+  def transform(modules: Seq[HeadersInTransformationModule],
                 reqId: String,
                 host: String,
                 service: Service,
                 target: Target,
                 request: HttpRequest,
                 waon: WithApiKeyOrNot,
-                headers: Seq[HttpHeader]): Seq[HttpHeader] = {
-    modules.foldLeft(Seq.empty[HttpHeader])(
+                headers: List[HttpHeader]): List[HttpHeader] = {
+    modules.foldLeft(List.empty[HttpHeader])(
       (seq, module) => seq ++ module.transform(reqId, host, service, target, request, waon, headers)
+    )
+  }
+}
+
+// can handle headers additions, like JWT header, request id, API quotas, etc ...
+trait HeadersOutTransformationModule extends Module {
+  def transform(reqId: String,
+                host: String,
+                service: Service,
+                target: Target,
+                request: HttpRequest,
+                waon: WithApiKeyOrNot,
+                proxyLatency: Long,
+                targetLatency: Long,
+                headers: List[HttpHeader]): List[HttpHeader]
+}
+object HeadersOutTransformationModule {
+  def transform(modules: Seq[HeadersOutTransformationModule],
+                reqId: String,
+                host: String,
+                service: Service,
+                target: Target,
+                request: HttpRequest,
+                waon: WithApiKeyOrNot,
+                proxyLatency: Long,
+                targetLatency: Long,
+                headers: List[HttpHeader]): List[HttpHeader] = {
+    modules.foldLeft(List.empty[HttpHeader])(
+      (seq, module) =>
+        seq ++ module.transform(reqId, host, service, target, request, waon, proxyLatency, targetLatency, headers)
     )
   }
 }

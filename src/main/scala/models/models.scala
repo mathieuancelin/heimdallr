@@ -83,8 +83,11 @@ case class ModulesConfig(modules: Seq[_ <: Module] = Seq.empty) {
   lazy val ServiceAccessModules: Seq[ServiceAccessModule] = modules.collect {
     case m: ServiceAccessModule => m
   }
-  lazy val HeadersTransformationModules: Seq[HeadersTransformationModule] = modules.collect {
-    case m: HeadersTransformationModule => m
+  lazy val HeadersInTransformationModules: Seq[HeadersInTransformationModule] = modules.collect {
+    case m: HeadersInTransformationModule => m
+  }
+  lazy val HeadersOutTransformationModules: Seq[HeadersOutTransformationModule] = modules.collect {
+    case m: HeadersOutTransformationModule => m
   }
   lazy val ErrorRendererModules: Seq[ErrorRendererModule] = modules.collect {
     case m: ErrorRendererModule => m
@@ -94,12 +97,15 @@ case class ModulesConfig(modules: Seq[_ <: Module] = Seq.empty) {
   }
 }
 
+case class LoggersConfig(level: String, wsLevel: String)
+
 case class ProxyConfig(
     http: HttpConfig = HttpConfig(),
     api: ApiConfig = ApiConfig(),
     services: Seq[Service] = Seq.empty,
     logConfigPath: Option[String] = None,
-    state: Option[StateConfig] = None
+    state: Option[StateConfig] = None,
+    loggers: LoggersConfig = LoggersConfig("INFO", "INFO")
 ) {
   def pretty: String = Encoders.ProxyConfigEncoder.apply(this).spaces2
 }
@@ -125,6 +131,7 @@ object Decoders {
   implicit val SeqOfServiceDecoder: Decoder[Seq[Service]]           = Decoder.decodeSeq(ServiceDecoder)
   implicit val HttpConfigDecoder: Decoder[HttpConfig]               = deriveDecoder[HttpConfig]
   implicit val ApiConfigDecoder: Decoder[ApiConfig]                 = deriveDecoder[ApiConfig]
+  implicit val LoggersConfigDecoder: Decoder[LoggersConfig]         = deriveDecoder[LoggersConfig]
   implicit val ProxyConfigDecoder: Decoder[ProxyConfig]             = deriveDecoder[ProxyConfig]
 }
 
@@ -148,6 +155,7 @@ object Encoders {
   implicit val SeqOfServiceEncoder: Encoder[Seq[Service]]           = Encoder.encodeSeq(ServiceEncoder)
   implicit val HttpConfigEncoder: Encoder[HttpConfig]               = deriveEncoder[HttpConfig]
   implicit val ApiConfigEncoder: Encoder[ApiConfig]                 = deriveEncoder[ApiConfig]
+  implicit val LoggersConfigEncoder: Encoder[LoggersConfig]         = deriveEncoder[LoggersConfig]
   implicit val ProxyConfigEncoder: Encoder[ProxyConfig]             = deriveEncoder[ProxyConfig]
 }
 
