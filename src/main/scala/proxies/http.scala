@@ -7,26 +7,23 @@ import java.util.{Base64, UUID}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.Uri.Authority
-import akka.http.scaladsl.model.headers.{Host, RawHeader}
+import akka.http.scaladsl.model.headers.Host
 import akka.http.scaladsl.model.ws.UpgradeToWebSocket
 import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.util.FastFuture
 import akka.pattern.CircuitBreaker
 import akka.stream.ActorMaterializer
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
 import com.codahale.metrics.MetricRegistry
 import models.{WithApiKeyOrNot, _}
+import modules._
 import org.slf4j.LoggerFactory
 import store.Store
-import util.HttpResponses._
-import util.Implicits._
 import util._
 
 import scala.concurrent.{Future, TimeoutException}
-import scala.util.{Success, Try}
+import scala.util.Success
 
-class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
+class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metrics: MetricRegistry)
     extends Startable[HttpProxy]
     with Stoppable[HttpProxy] {
 
@@ -35,7 +32,7 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
   implicit val materializer = ActorMaterializer()
   implicit val http         = Http(system)
 
-  lazy val logger = LoggerFactory.getLogger("proxy")
+  lazy val logger = LoggerFactory.getLogger("heimdallr")
 
   val decoder = Base64.getUrlDecoder
 
@@ -56,12 +53,14 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
   def findService(host: String, path: Uri.Path, headers: Map[String, HttpHeader]): Option[Service] = {
     val uri = path.toString()
     store.get().get(host).flatMap { services =>
-      val sortedServices = services.filter(_.enabled).sortWith(
-        (a, _) =>
-          if (a.root.isDefined && a.matchingHeaders.nonEmpty) true
-          else if (a.root.isEmpty && a.matchingHeaders.nonEmpty) true
-          else a.root.isDefined
-      )
+      val sortedServices = services
+        .filter(_.enabled)
+        .sortWith(
+          (a, _) =>
+            if (a.root.isDefined && a.matchingHeaders.nonEmpty) true
+            else if (a.root.isEmpty && a.matchingHeaders.nonEmpty) true
+            else a.root.isDefined
+        )
       var found: Option[Service] = None
       var index                  = 0
       while (found.isEmpty && index < sortedServices.size) {
@@ -91,44 +90,6 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
     }
   }
 
-  def extractApiKey(request: HttpRequest, service: Service): WithApiKeyOrNot = {
-    request.getHeader(authHeaderName).asOption.flatMap { header =>
-      Try {
-        val value = header.value()
-        if (value.startsWith("Basic")) {
-          val token = value.replace("Basic ", "")
-          new String(decoder.decode(token), "UTF-8").split(":").toList match {
-            case clientId :: clientSecret :: Nil =>
-              service.apiKeys
-                .filter(a => a.enabled && a.clientId == clientId && a.clientSecret == clientSecret)
-                .lastOption match {
-                case Some(apiKey) => WithApiKey(apiKey)
-                case None         => BadApiKey
-              }
-            case _ => NoApiKey
-          }
-        } else if (value.startsWith("Bearer")) {
-          val token    = value.replace("Bearer ", "")
-          val JWTToken = JWT.decode(token)
-          val issuer   = JWTToken.getIssuer
-          service.apiKeys.find(apk => apk.enabled && apk.clientId == issuer) match {
-            case Some(key) =>
-              val algorithm = Algorithm.HMAC512(key.clientSecret)
-              val verifier  = JWT.require(algorithm).withIssuer(JWTToken.getIssuer).build
-              verifier.verify(token)
-              WithApiKey(key)
-            case None => BadApiKey
-          }
-        } else {
-          NoApiKey
-        }
-      }.toOption
-    } match {
-      case Some(withApiKeyOrNot) => withApiKeyOrNot
-      case None                  => NoApiKey
-    }
-  }
-
   def extractCallRestriction(service: Service, path: Uri.Path): CallRestriction = {
     val uri                 = path.toString()
     val privatePatternMatch = service.privatePatterns.exists(p => RegexPool(p).matches(uri))
@@ -146,13 +107,13 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
     val host      = extractHost(request)
     val fu = findService(host, request.uri.path, request.headers.groupBy(_.name()).mapValues(_.last)) match {
       case Some(service) => {
-        val rawSeq          = service.targets
+        val rawSeq          = TargetSetChooserModule.choose(modules.TargetSetChooserModules, requestId, service, request)
         val seq             = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
-        val withApiKeyOrNot = extractApiKey(request, service)
+        val withApiKeyOrNot = ServiceAccessModule.access(modules.ServiceAccessModules, requestId, service, request)
         val callRestriction = extractCallRestriction(service, request.uri.path)
 
         @inline
-        def makeTheCall(): Future[HttpResponse] = {
+        def makeTheCall(waon: WithApiKeyOrNot): Future[HttpResponse] = {
           Retry
             .retry(service.clientConfig.retry) {
               val index  = counter.incrementAndGet() % (if (seq.nonEmpty) seq.size else 1)
@@ -169,11 +130,15 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
               )
               val headersIn: Seq[HttpHeader] =
               request.headers.filterNot(t => t.name() == "Host" || t.name() == authHeaderName) ++
-              service.additionalHeaders.toSeq.map(t => RawHeader(t._1, t._2)) :+
-              Host(target.host) :+
-              RawHeader("X-Request-Id", requestId) :+
-              RawHeader("X-Fowarded-Host", host) :+
-              RawHeader("X-Fowarded-Scheme", request.uri.scheme)
+              HeadersTransformationModule.transform(modules.HeadersTransformationModules,
+                                                    requestId,
+                                                    host,
+                                                    service,
+                                                    target,
+                                                    request,
+                                                    waon,
+                                                    request.headers) :+
+              Host(target.host)
               val proxyRequest = request.copy(
                 uri = request.uri.copy(
                   path = Uri.Path(service.targetRoot) ++ request.uri.path,
@@ -222,32 +187,63 @@ class HttpProxy(config: ProxyConfig, store: Store, metrics: MetricRegistry)
             .recover {
               case _: akka.pattern.CircuitBreakerOpenException =>
                 request.discardEntityBytes()
-                BadGateway("Circuit breaker is open")
+                ErrorRendererModule.render(modules.ErrorRendererModules,
+                                           requestId,
+                                           502,
+                                           "Circuit breaker is open",
+                                           Some(service),
+                                           request)
               case _: TimeoutException =>
                 request.discardEntityBytes()
-                GatewayTimeout()
+                ErrorRendererModule.render(modules.ErrorRendererModules,
+                                           requestId,
+                                           504,
+                                           "Gateway Time-out",
+                                           Some(service),
+                                           request)
               case e =>
                 request.discardEntityBytes()
-                BadGateway(e.getMessage)
+                ErrorRendererModule.render(modules.ErrorRendererModules,
+                                           requestId,
+                                           502,
+                                           e.getMessage,
+                                           Some(service),
+                                           request)
             }
         }
-        (callRestriction, withApiKeyOrNot) match {
-          case (PublicCall, _) => makeTheCall()
-          case (PrivateCall, NoApiKey) =>
-            request.discardEntityBytes()
-            FastFuture.successful(Unauthorized("No ApiKey provided"))
-          case (PrivateCall, WithApiKey(apiKey)) => makeTheCall()
-          case (PrivateCall, BadApiKey) =>
-            request.discardEntityBytes()
-            FastFuture.successful(Unauthorized("Bad ApiKey provided"))
-          case _ =>
-            request.discardEntityBytes()
-            FastFuture.successful(Unauthorized("No ApiKey provided"))
+
+        PreconditionModule.validatePreconditions(modules.PreconditionModules, requestId, service, request) match {
+          case Left(resp) => FastFuture.successful(resp)
+          case Right(_) =>
+            (callRestriction, withApiKeyOrNot) match {
+              case (PublicCall, waon) => makeTheCall(waon)
+              case (PrivateCall, NoApiKey) =>
+                request.discardEntityBytes()
+                FastFuture.successful(
+                  ErrorRendererModule
+                    .render(modules.ErrorRendererModules, requestId, 401, "No ApiKey provided", Some(service), request)
+                )
+              case (PrivateCall, waon @ WithApiKey(_)) => makeTheCall(waon)
+              case (PrivateCall, BadApiKey) =>
+                request.discardEntityBytes()
+                FastFuture.successful(
+                  ErrorRendererModule
+                    .render(modules.ErrorRendererModules, requestId, 401, "Bad ApiKey provided", Some(service), request)
+                )
+              case _ =>
+                request.discardEntityBytes()
+                FastFuture.successful(
+                  ErrorRendererModule
+                    .render(modules.ErrorRendererModules, requestId, 401, "No ApiKey provided", Some(service), request)
+                )
+            }
         }
       }
       case None =>
         request.discardEntityBytes()
-        FastFuture.successful(NotFound(host))
+        FastFuture.successful(
+          ErrorRendererModule.render(modules.ErrorRendererModules, requestId, 404, "No ApiKey provided", None, request)
+        )
     }
     fu.andThen { case _ => start.close() }
   }

@@ -26,7 +26,11 @@ case class ClientConfig(retry: Int = 3,
                         callTimeout: FiniteDuration = 30.seconds,
                         resetTimeout: FiniteDuration = 10.seconds)
 
-case class ApiKey(clientId: String, clientSecret: String, name: String, enabled: Boolean, metadata: Map[String, String] = Map.empty)
+case class ApiKey(clientId: String,
+                  clientSecret: String,
+                  name: String,
+                  enabled: Boolean,
+                  metadata: Map[String, String] = Map.empty)
 
 case class Service(id: String,
                    domain: String,
@@ -150,7 +154,7 @@ object Encoders {
 sealed trait WithApiKeyOrNot
 case object NoApiKey                  extends WithApiKeyOrNot
 case object BadApiKey                 extends WithApiKeyOrNot
-case class  WithApiKey(apiKey: ApiKey) extends WithApiKeyOrNot
+case class WithApiKey(apiKey: ApiKey) extends WithApiKeyOrNot
 
 sealed trait CallRestriction
 case object PublicCall  extends CallRestriction

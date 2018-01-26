@@ -13,21 +13,36 @@ import util.Implicits._
 import scala.util.Try
 
 object Modules {
-  val defaultModules: ModulesConfig = ModulesConfig()
+  val defaultModules: ModulesConfig = ModulesConfig(
+    Seq(
+      new DefaultPreconditionModule(),
+      new DefaultServiceAccessModule(),
+      new DefaultHeadersTransformationModule(),
+      new DefaultErrorRendererModule(),
+      new DefaultTargetSetChooserModule(),
+    )
+  )
 }
 
 class DefaultPreconditionModule extends PreconditionModule {
 
   override def id: String = "DefaultPreconditionModule"
 
-  override def validatePreconditions(reqId: String, service: Service, request: HttpRequest): Either[HttpResponse, Unit] = {
+  override def validatePreconditions(reqId: String,
+                                     service: Service,
+                                     request: HttpRequest): Either[HttpResponse, Unit] = {
     if (service.enabled) {
       Right(())
     } else {
-      Left(HttpResponse(
-        404,
-        entity = HttpEntity(ContentTypes.`application/json`, Json.obj("error" -> Json.fromString("service not found"), "reqId" -> Json.fromString(reqId)).noSpaces)
-      ))
+      Left(
+        HttpResponse(
+          404,
+          entity = HttpEntity(
+            ContentTypes.`application/json`,
+            Json.obj("error" -> Json.fromString("service not found"), "reqId" -> Json.fromString(reqId)).noSpaces
+          )
+        )
+      )
     }
   }
 }
@@ -83,11 +98,17 @@ class DefaultHeadersTransformationModule extends HeadersTransformationModule {
 
   override def id: String = "DefaultHeadersTransformationModule"
 
-  override def transform(reqId: String, host: String, service: Service, target: Target, request: HttpRequest, waon: WithApiKeyOrNot, headers: Seq[HttpHeader]): Seq[HttpHeader] = {
+  override def transform(reqId: String,
+                         host: String,
+                         service: Service,
+                         target: Target,
+                         request: HttpRequest,
+                         waon: WithApiKeyOrNot,
+                         headers: Seq[HttpHeader]): Seq[HttpHeader] = {
     service.additionalHeaders.toSeq.map(t => RawHeader(t._1, t._2)) :+
-      RawHeader("X-Request-Id", reqId) :+
-      RawHeader("X-Fowarded-Host", host) :+
-      RawHeader("X-Fowarded-Scheme", request.uri.scheme)
+    RawHeader("X-Request-Id", reqId) :+
+    RawHeader("X-Fowarded-Host", host) :+
+    RawHeader("X-Fowarded-Scheme", request.uri.scheme)
   }
 }
 
@@ -95,9 +116,14 @@ class DefaultErrorRendererModule extends ErrorRendererModule {
 
   override def id: String = "DefaultErrorRendererModule"
 
-  override def render(reqId: String, status: Int, message: String, service: Service, request: HttpRequest): HttpResponse = HttpResponse(
+  override def render(reqId: String,
+                      status: Int,
+                      message: String,
+                      service: Option[Service],
+                      request: HttpRequest): HttpResponse = HttpResponse(
     status,
-    entity = HttpEntity(ContentTypes.`application/json`, Json.obj("error" -> Json.fromString(message), "reqId" -> Json.fromString(reqId)).noSpaces)
+    entity = HttpEntity(ContentTypes.`application/json`,
+                        Json.obj("error" -> Json.fromString(message), "reqId" -> Json.fromString(reqId)).noSpaces)
   )
 }
 
@@ -107,4 +133,3 @@ class DefaultTargetSetChooserModule extends TargetSetChooserModule {
 
   override def choose(reqId: String, service: Service, request: HttpRequest): Seq[Target] = service.targets
 }
-

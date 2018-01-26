@@ -1,5 +1,3 @@
 package modules
 
-class otoroshi {
-
-}
+class otoroshi {}

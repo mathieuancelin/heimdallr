@@ -4,7 +4,7 @@ import org.slf4j.LoggerFactory
 object Main {
   def main(args: Array[String]) {
 
-    val logger = LoggerFactory.getLogger("proxy")
+    val logger = LoggerFactory.getLogger("heimdallr")
 
     val demoConfig = ProxyConfig(
       // statePath = Some("./state.json"),

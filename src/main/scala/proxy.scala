@@ -13,6 +13,7 @@ import com.codahale.metrics.MetricRegistry
 import com.codahale.metrics.jmx.JmxReporter
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigRenderOptions, ConfigResolveOptions}
 import models._
+import modules.Modules
 import org.slf4j.LoggerFactory
 import proxies.HttpProxy
 import store.Store
@@ -21,11 +22,11 @@ import util.{Startable, Stoppable}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class Proxy(config: ProxyConfig) extends Startable[Proxy] with Stoppable[Proxy] {
+class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[Proxy] with Stoppable[Proxy] {
 
   val metrics   = new MetricRegistry()
   val store     = new Store(config.services.groupBy(_.domain), config.state, metrics)
-  val httpProxy = new HttpProxy(config, store, metrics)
+  val httpProxy = new HttpProxy(config, store, modules, metrics)
   val adminApi  = new AdminApi(config, store, metrics)
 
   private val jmxReporter = JmxReporter
@@ -69,10 +70,11 @@ class Proxy(config: ProxyConfig) extends Startable[Proxy] with Stoppable[Proxy] 
 
 object Proxy {
 
-  private val logger = LoggerFactory.getLogger("proxy")
+  private val logger = LoggerFactory.getLogger("heimdallr")
 
-  def withConfig(config: ProxyConfig): Proxy = new Proxy(config)
-  def fromConfigPath(path: String): Either[ConfigError, Proxy] = {
+  def withConfig(config: ProxyConfig, modules: ModulesConfig = Modules.defaultModules): Proxy =
+    new Proxy(config, modules)
+  def fromConfigPath(path: String, modules: ModulesConfig = Modules.defaultModules): Either[ConfigError, Proxy] = {
     if (path.startsWith("http://") || path.startsWith("https://")) {
       logger.info(s"Loading configuration from http resource @ $path")
       val system        = ActorSystem()
@@ -98,7 +100,7 @@ object Proxy {
         case Left(e) => Left(ConfigError(e.message))
         case Right(json) =>
           Decoders.ProxyConfigDecoder.decodeJson(json) match {
-            case Right(config) => Right(new Proxy(config))
+            case Right(config) => Right(new Proxy(config, modules))
             case Left(e)       => Left(ConfigError(e.message))
           }
       }
@@ -108,7 +110,7 @@ object Proxy {
       fromConfigFile(new File(path))
     }
   }
-  def fromConfigFile(file: File): Either[ConfigError, Proxy] = {
+  def fromConfigFile(file: File, modules: ModulesConfig = Modules.defaultModules): Either[ConfigError, Proxy] = {
     logger.info(s"Loading configuration from file @ ${file.toPath.toString}")
     val withLoader = ConfigParseOptions.defaults.setClassLoader(getClass.getClassLoader)
     val conf = ConfigFactory
@@ -121,7 +123,7 @@ object Proxy {
       case Left(e) => Left(ConfigError(e.message))
       case Right(json) =>
         Decoders.ProxyConfigDecoder.decodeJson(json) match {
-          case Right(config) => Right(new Proxy(config))
+          case Right(config) => Right(new Proxy(config, modules))
           case Left(e)       => Left(ConfigError(e.message))
         }
     }

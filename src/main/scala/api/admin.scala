@@ -25,7 +25,7 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
   implicit val materializer = ActorMaterializer()
   implicit val http         = Http(system)
 
-  lazy val logger = LoggerFactory.getLogger("proxy")
+  lazy val logger = LoggerFactory.getLogger("heimdallr")
 
   def handler(request: HttpRequest): Future[HttpResponse] = {
     (request.method, request.uri.path) match {

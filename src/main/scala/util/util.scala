@@ -33,7 +33,7 @@ import scala.util.{Failure, Random, Success}
 
 class DynamicKeyManager(manager: X509KeyManager) extends X509KeyManager {
 
-  lazy val logger = LoggerFactory.getLogger("proxy")
+  lazy val logger = LoggerFactory.getLogger("heimdallr")
 
   logger.info("DynamicKeyManager")
 
@@ -70,7 +70,7 @@ class DynamicKeyManager(manager: X509KeyManager) extends X509KeyManager {
 
 class DynamicTrustManager(manager: X509TrustManager) extends X509TrustManager {
 
-  lazy val logger = LoggerFactory.getLogger("proxy")
+  lazy val logger = LoggerFactory.getLogger("heimdallr")
 
   logger.info("DynamicTrustManager")
 

@@ -39,7 +39,7 @@ class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Serv
   private val readCounter  = metrics.counter("store-reads")
   private val writeCounter = metrics.counter("store-writes")
 
-  lazy val logger = LoggerFactory.getLogger("proxy")
+  lazy val logger = LoggerFactory.getLogger("heimdallr")
 
   private val ref: AtomicReference[Map[String, Seq[Service]]] = {
     if (stateConfig.isDefined) {

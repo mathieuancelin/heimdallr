@@ -1,5 +1,3 @@
 package kafka
 
-class kafka {
-
-}
+class kafka {}
