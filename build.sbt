@@ -1,18 +1,17 @@
 enablePlugins(JavaAppPackaging)
 enablePlugins(JavaAgent)
 
-name := """reverse-proxy"""
-organization := "io.mancelin"
+name := """heimdallr"""
+organization := "io.heimdallr"
 version := "1.0.0"
 scalaVersion := "2.12.4"
 
 libraryDependencies ++= {
-  lazy val akkaHttpVersion  = "10.0.11"
-  lazy val akkaHttpVersion2 = "10.1.0-RC1"
+  lazy val akkaHttpVersion = "10.1.0-RC1"
   lazy val akkaVersion      = "2.5.9"
   Seq(
-    "com.typesafe.akka"      %% "akka-http"          % akkaHttpVersion2,
-    "com.typesafe.akka"      %% "akka-http2-support" % akkaHttpVersion2,
+    "com.typesafe.akka"      %% "akka-http"          % akkaHttpVersion,
+    "com.typesafe.akka"      %% "akka-http2-support" % akkaHttpVersion,
     "com.typesafe.akka"      %% "akka-stream"        % akkaVersion,
     "com.typesafe.akka"      %% "akka-actor"         % akkaVersion,
     "com.typesafe.akka"      %% "akka-stream-kafka"  % "0.18",
@@ -29,7 +28,8 @@ libraryDependencies ++= {
     "com.github.gphat"       %% "censorinus"         % "2.1.8",
     "org.bouncycastle"       % "bcprov-jdk15on"      % "1.59",
     "org.bouncycastle"       % "bcpkix-jdk15on"      % "1.59",
-    "org.bouncycastle"       % "bctls-jdk15on"       % "1.59"
+    "org.bouncycastle"       % "bctls-jdk15on"       % "1.59",
+    "com.google.guava"       % "guava"               % "23.0"
   )
 }
 
@@ -39,7 +39,7 @@ mainClass in Compile := Some("Main")
 mainClass in reStart := Some("Main")
 mainClass in assembly := Some("Main")
 
-assemblyJarName in assembly := "proxy.jar"
+assemblyJarName in assembly := "heimdallr.jar"
 test in assembly := {}
 
 scalacOptions ++= Seq(

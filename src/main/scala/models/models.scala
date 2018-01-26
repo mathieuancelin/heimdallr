@@ -2,10 +2,11 @@ package models
 
 import java.util.concurrent.TimeUnit
 
-import akka.http.scaladsl.model.{HttpProtocol, HttpProtocols}
+import akka.http.scaladsl.model._
 import io.circe.Decoder.Result
 import io.circe._
 import io.circe.generic.semiauto._
+import modules._
 import store.Store
 import util.IdGenerator
 
@@ -25,7 +26,7 @@ case class ClientConfig(retry: Int = 3,
                         callTimeout: FiniteDuration = 30.seconds,
                         resetTimeout: FiniteDuration = 10.seconds)
 
-case class ApiKey(clientId: String, clientSecret: String, name: String, enabled: Boolean)
+case class ApiKey(clientId: String, clientSecret: String, name: String, enabled: Boolean, metadata: Map[String, String] = Map.empty)
 
 case class Service(id: String,
                    domain: String,
@@ -38,7 +39,8 @@ case class Service(id: String,
                    targetRoot: String = "",
                    root: Option[String] = None,
                    publicPatterns: Set[String] = Set.empty,
-                   privatePatterns: Set[String] = Set.empty)
+                   privatePatterns: Set[String] = Set.empty,
+                   metadata: Map[String, String] = Map.empty)
 
 case class LocalStateConfig(path: String, writeEvery: FiniteDuration = 10.seconds)
 case class RemoteStateConfig(url: String, headers: Map[String, String], pollEvery: FiniteDuration = 10.seconds)
@@ -70,6 +72,23 @@ case class ApiConfig(
     certPass: Option[String] = None,
     enabled: Boolean = true
 )
+case class ModulesConfig(modules: Seq[_ <: Module] = Seq.empty) {
+  lazy val PreconditionModules: Seq[PreconditionModule] = modules.collect {
+    case m: PreconditionModule => m
+  }
+  lazy val ServiceAccessModules: Seq[ServiceAccessModule] = modules.collect {
+    case m: ServiceAccessModule => m
+  }
+  lazy val HeadersTransformationModules: Seq[HeadersTransformationModule] = modules.collect {
+    case m: HeadersTransformationModule => m
+  }
+  lazy val ErrorRendererModules: Seq[ErrorRendererModule] = modules.collect {
+    case m: ErrorRendererModule => m
+  }
+  lazy val TargetSetChooserModules: Seq[TargetSetChooserModule] = modules.collect {
+    case m: TargetSetChooserModule => m
+  }
+}
 
 case class ProxyConfig(
     http: HttpConfig = HttpConfig(),
@@ -82,6 +101,9 @@ case class ProxyConfig(
 }
 
 object Decoders {
+
+  import models.Decoders._
+
   implicit val FiniteDurationDecoder: Decoder[FiniteDuration] = new Decoder[FiniteDuration] {
     override def apply(c: HCursor): Result[FiniteDuration] =
       c.as[Long].map(v => FiniteDuration(v, TimeUnit.MILLISECONDS))
@@ -103,6 +125,9 @@ object Decoders {
 }
 
 object Encoders {
+
+  import models.Encoders._
+
   implicit val FiniteDurationEncoder: Encoder[FiniteDuration] = new Encoder[FiniteDuration] {
     override def apply(a: FiniteDuration): Json = Json.fromLong(a.toMillis)
   }
@@ -122,12 +147,12 @@ object Encoders {
   implicit val ProxyConfigEncoder: Encoder[ProxyConfig]             = deriveEncoder[ProxyConfig]
 }
 
-trait WithApiKeyOrNot
+sealed trait WithApiKeyOrNot
 case object NoApiKey                  extends WithApiKeyOrNot
 case object BadApiKey                 extends WithApiKeyOrNot
-case class WithApiKey(apiKey: ApiKey) extends WithApiKeyOrNot
+case class  WithApiKey(apiKey: ApiKey) extends WithApiKeyOrNot
 
-trait CallRestriction
+sealed trait CallRestriction
 case object PublicCall  extends CallRestriction
 case object PrivateCall extends CallRestriction
 

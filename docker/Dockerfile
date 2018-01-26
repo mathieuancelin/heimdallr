@@ -1,5 +1,6 @@
 FROM openjdk:8u151-jre-alpine
 
+LABEL name "Heimdallr"
 LABEL maintainer "Mathieu ANCELIN"
 
 RUN mkdir -p /usr/app

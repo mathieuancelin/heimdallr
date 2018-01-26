@@ -1,10 +1,10 @@
-# reverse-proxy
+# Heimdallr
 
 Experimental project to try new things on http reverse proxies. Do not use in production ... yet ;)
 
 ## Features
 
-- [ ] find a name for the project
+- [x] find a name for the project
 - [x] admin API complete on another port. Add service to serve this api
 - [x] api based on diff commands
 - [ ] write some docs in readme
