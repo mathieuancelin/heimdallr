@@ -64,18 +64,18 @@ object Main {
 
     args
       .find(_.equals("--demo"))
-      .map(_ => Proxy.withConfig(demoConfig).start().stopOnShutdown())
+      .map(_ => Proxy.withConfig(demoConfig).copy(modules = modules.Modules.defaultModules).start().stopOnShutdown())
       .orElse(args.find(_.startsWith("--proxy.config=")).map(_.replace("--proxy.config=", "")).map { path =>
         Proxy.fromConfigPath(path) match {
           case Left(e)      => logger.error(s"Error while loading config file @ $path: $e")
-          case Right(proxy) => proxy.start().stopOnShutdown()
+          case Right(proxy) => proxy.copy(modules = modules.Modules.defaultModules).start().stopOnShutdown()
         }
       })
       .getOrElse {
-        val path = "./proxy.conf"
+        val path = "./heimdallr.conf"
         Proxy.fromConfigPath(path) match {
           case Left(e)      => logger.error(s"Error while loading config file @ $path: $e")
-          case Right(proxy) => proxy.start().stopOnShutdown()
+          case Right(proxy) => proxy.copy(modules = modules.Modules.defaultModules).start().stopOnShutdown()
         }
       }
   }

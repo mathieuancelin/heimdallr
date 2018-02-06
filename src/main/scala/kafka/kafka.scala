@@ -1,3 +1,4 @@
+/*
 package kafka
 
 import akka.Done
@@ -120,3 +121,4 @@ class KafkaEventProducer(config: KafkaConfig, topicFunction: KafkaConfig => Stri
 
   }
 }
+*/

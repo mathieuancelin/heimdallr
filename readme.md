@@ -16,15 +16,16 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [ ] built-in kafka support as logs output
 - [ ] statsd support (include metrics in statsd actor for REST metrics)
 - [ ] dynamic TLS
-- [ ] docker dev
-- [ ] session.sh
-- [ ] build.sh
+- [x] docker dev
+- [x] session.sh
+- [x] build.sh
 - [ ] travis.yml
 - [ ] upload on bintray
 - [ ] scan config file for changes and reload
-- [ ] API to get one service per command
-- [ ] read API rest style to get services
-- [ ] read API rest style to get one service
+- [x] API to change state of a Proxy instance
+- [x] API to get one service per command
+- [x] read API rest style to get services
+- [x] read API rest style to get one service
 - [x] disable api from config
 - [x] config for state file (period for writes, enabled or not, etc ...)
 - [x] demo mode (--demo) or use config file ./proxy.conf

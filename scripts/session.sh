@@ -25,9 +25,9 @@ tmux send-keys -t $SESSION_NAME:1.2 clear C-m
 tmux send-keys -t $SESSION_NAME:1.3 clear C-m
 tmux send-keys -t $SESSION_NAME:1.4 clear C-m
 
-tmux send-keys -t $SESSION_NAME:1.1 "sbt '~reStart'"  C-m
+tmux send-keys -t $SESSION_NAME:1.1 "sbt"  C-m
 tmux send-keys -t $SESSION_NAME:1.2 "sh ./scripts/fmt.sh"
-tmux send-keys -t $SESSION_NAME:1.3 'wrk -t2 -c200 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8081/'
+tmux send-keys -t $SESSION_NAME:1.3 'wrk -t2 -c200 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8091/'
 tmux send-keys -t $SESSION_NAME:1.4 "git status" C-m
 
 tmux select-window -t $SESSION_NAME:1

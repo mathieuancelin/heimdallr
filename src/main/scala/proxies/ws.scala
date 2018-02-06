@@ -25,7 +25,7 @@ class WebSocketProxyActor(uri: Uri,
                           headers: Seq[HttpHeader])
     extends Actor {
 
-  lazy val logger = LoggerFactory.getLogger("heimdallr-ws")
+  lazy val logger = LoggerFactory.getLogger("heimdallr")
   lazy val source = Source.queue[Message](50000, OverflowStrategy.dropTail)
 
   implicit val ec  = context.dispatcher

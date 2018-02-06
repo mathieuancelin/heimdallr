@@ -22,7 +22,7 @@ import util.{Startable, Stoppable}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[Proxy] with Stoppable[Proxy] {
+case class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[Proxy] with Stoppable[Proxy] {
 
   val metrics   = new MetricRegistry()
   val store     = new Store(config.services.groupBy(_.domain), config.state, metrics)
@@ -46,10 +46,9 @@ class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[Proxy
       configStream.close()
     }
     loggerContext.getLogger("heimdallr").setLevel(Level.valueOf(config.loggers.level))
-    loggerContext.getLogger("heimdallr-ws").setLevel(Level.valueOf(config.loggers.wsLevel))
   }
 
-  override def start(): Stoppable[Proxy] = {
+  override def start(): Proxy = {
     setupLoggers()
     store.start()
     httpProxy.start()
@@ -67,6 +66,14 @@ class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[Proxy
       adminApi.stop()
     }
     jmxReporter.stop()
+  }
+
+  def updateState(f: Seq[Service] => Seq[Service]): Seq[Service] = {
+    store.modify(m => f(m.values.toSeq.flatten).groupBy(_.domain)).values.toSeq.flatten
+  }
+
+  def getState(): Seq[Service] = {
+    store.get().values.toSeq.flatten
   }
 }
 

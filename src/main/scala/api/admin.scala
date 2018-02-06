@@ -29,6 +29,16 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
 
   def handler(request: HttpRequest): Future[HttpResponse] = {
     (request.method, request.uri.path) match {
+      case (HttpMethods.GET,  Uri.Path("/services")) => {
+        FastFuture.successful(Ok(Encoders.SeqOfServiceEncoder(store.get().values.flatten.toSeq)))
+      }
+      case (HttpMethods.GET,  path) if path.startsWith(Uri.Path("/services/")) => {
+        val serviceId = path.toString.replace("/services/", "")
+        store.get().values.flatten.toSeq.find(_.id == serviceId) match {
+          case Some(service) => FastFuture.successful(Ok(Encoders.ServiceEncoder(service)))
+          case None => FastFuture.successful(NotFound(s"Service with id $serviceId does not exist"))
+        }
+      }
       case (HttpMethods.POST, Uri.Path("/command")) =>
         request.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { bs =>
           val body = bs.utf8String

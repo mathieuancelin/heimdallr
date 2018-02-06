@@ -97,7 +97,7 @@ case class ModulesConfig(modules: Seq[_ <: Module] = Seq.empty) {
   }
 }
 
-case class LoggersConfig(level: String, wsLevel: String)
+case class LoggersConfig(level: String)
 
 case class ProxyConfig(
     http: HttpConfig = HttpConfig(),
@@ -105,7 +105,7 @@ case class ProxyConfig(
     services: Seq[Service] = Seq.empty,
     logConfigPath: Option[String] = None,
     state: Option[StateConfig] = None,
-    loggers: LoggersConfig = LoggersConfig("INFO", "INFO")
+    loggers: LoggersConfig = LoggersConfig("INFO")
 ) {
   def pretty: String = Encoders.ProxyConfigEncoder.apply(this).spaces2
 }
@@ -188,6 +188,16 @@ case class GetStateCommand(command: String) extends Command {
   override def applyModification(store: Store): Json = {
     val seq = store.get().values.flatten.toSeq
     Json.obj("state" -> Encoders.SeqOfServiceEncoder(seq))
+  }
+}
+
+case class GetServiceCommand(command: String, serviceId: String) extends Command {
+  def modify(state: Seq[Service]): Seq[Service] = state
+  override def applyModification(store: Store): Json = {
+    store.get().values.flatten.toSeq.find(_.id == serviceId) match {
+      case Some(service) => Encoders.ServiceEncoder(service)
+      case None => Json.obj("error" -> Json.fromString("not found"))
+    }
   }
 }
 
@@ -576,6 +586,7 @@ object Command {
   val NothingCommandDecoder: Decoder[NothingCommand]                         = deriveDecoder[NothingCommand]
   val LoadStateCommandDecoder: Decoder[LoadStateCommand]                     = deriveDecoder[LoadStateCommand]
   val GetStateCommandDecoder: Decoder[GetStateCommand]                       = deriveDecoder[GetStateCommand]
+  val GetServiceCommand: Decoder[GetServiceCommand]                          = deriveDecoder[GetServiceCommand]
   val GetMetricsCommandDecoder: Decoder[GetMetricsCommand]                   = deriveDecoder[GetMetricsCommand]
   val ChangeDomainCommandDecoder: Decoder[ChangeDomainCommand]               = deriveDecoder[ChangeDomainCommand]
   val AddTargetCommandDecoder: Decoder[AddTargetCommand]                     = deriveDecoder[AddTargetCommand]
@@ -615,7 +626,8 @@ object Command {
       case "RemoveServiceCommand"          => RemoveServiceCommandDecoder.decodeJson(json)
       case "LoadStateCommand"              => LoadStateCommandDecoder.decodeJson(json)
       case "GetStateCommand"               => GetStateCommandDecoder.decodeJson(json)
-      case "GetpMetricsCommand"            => GetMetricsCommandDecoder.decodeJson(json)
+      case "GetServiceCommand"             => GetServiceCommand.decodeJson(json)
+      case "GetMetricsCommand"             => GetMetricsCommandDecoder.decodeJson(json)
       case "ChangeDomainCommand"           => ChangeDomainCommandDecoder.decodeJson(json)
       case "AddTargetCommand"              => AddTargetCommandDecoder.decodeJson(json)
       case "RemoveTargetCommand"           => RemoveTargetCommandDecoder.decodeJson(json)
