@@ -11,6 +11,7 @@ build_docker () {
   cp $LOCATION/target/scala-2.12/heimdallr.jar $LOCATION/docker/build/
   cd $LOCATION/docker/build
   docker build -t heimdallr .
+  rm -f $LOCATION/docker/build/heimdallr.jar
   cd $LOCATION
 }
 
