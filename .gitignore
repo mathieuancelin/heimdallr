@@ -21,3 +21,4 @@ project/plugins/project/
 go
 .DS_Store
 state.json
+*.swp
