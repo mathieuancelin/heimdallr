@@ -1,6 +1,10 @@
 # Heimdallr
 
-Experimental project to try new things on http reverse proxies. Do not use in production ... yet ;)
+Experimental project to try new things on http reverse proxies. Do not use in production ... yet, or not ;)
+
+## Use it
+
+## Build it
 
 ## Features
 
@@ -10,13 +14,22 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [ ] write some docs in readme
 - [ ] built-in kafka support as commands input
 - [ ] built-in kafka support as logs output
+- [ ] statsd support (include metrics in statsd actor for REST metrics)
 - [ ] dynamic TLS
+- [ ] docker dev
+- [ ] session.sh
+- [ ] build.sh
+- [ ] travis.yml
+- [ ] upload on bintray
+- [ ] scan config file for changes and reload
+- [ ] API to get one service per command
+- [ ] read API rest style to get services
+- [ ] read API rest style to get one service
 - [x] disable api from config
 - [x] config for state file (period for writes, enabled or not, etc ...)
 - [x] demo mode (--demo) or use config file ./proxy.conf
 - [x] remote config file
 - [x] remote state (with polling support from conf)
-- [ ] statsd support (include metrics in statsd actor for REST metrics)
 - [x] ProxyConfig object for Api integration
 - [x] withConfig(ProxyConfig)
 - [x] withConfigFrom(path)
@@ -38,11 +51,13 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 - [x] pass --proxy.config=???
 - [x] pass --proxy.config=???
 - [x] shutdown hook in main
-- [ ] handle service access preconditions with pluggable podules
-- [ ] handle service access with pluggable modules (apikey + throttling, global throtthling, ip filtering)
-- [ ] handle headers out manipulation with pluggable modules
-- [ ] handle errors rendering with pluggable modules
-- [ ] handle target set choice with pluggable modules
+- [x] handle service access preconditions with pluggable modules
+- [x] handle service access with pluggable modules (apikey + throttling, global throtthling, ip filtering)
+- [x] handle headers out manipulation with pluggable modules
+- [x] handle errors rendering with pluggable modules
+- [x] handle target set choice with pluggable modules
+- [ ] cleaner call to modules
+- [ ] handle serde calls for services with pluggables modules
 
 ## Missing from otoroshi
 
@@ -62,7 +77,6 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 * [ ] push api usage back
 * [ ] alerts
 * [ ] push alerts back
-
 
 ## Helpers
 
