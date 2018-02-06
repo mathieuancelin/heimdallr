@@ -21,11 +21,11 @@ RUN mv $HOME/tmux.conf $HOME/.tmux.conf
 RUN mv $HOME/vimrc $HOME/.vimrc
 RUN mv $HOME/zshrc $HOME/.zshrc
 RUN vim -c ":PlugInstall" -c ":qa"
-RUN git clone https://github.com/mathieuancelin/heimdallr.git $HOME/heimdallr
+RUN mkdir heimdallr && cd $HOME/heimdallr && git init && git remote add origin https://github.com/mathieuancelin/heimdallr.git
 RUN rm -f $HOME/Dockerfile
 RUN rm -f $HOME/sbt-1.1.0.zip
 
-EXPOSE 8081
+EXPOSE 8091
 EXPOSE 8443
 EXPOSE 9081
 EXPOSE 9443

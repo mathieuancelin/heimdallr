@@ -121,4 +121,4 @@ class KafkaEventProducer(config: KafkaConfig, topicFunction: KafkaConfig => Stri
 
   }
 }
-*/
+ */

@@ -6,6 +6,16 @@ Experimental project to try new things on http reverse proxies. Do not use in pr
 
 ## Build it
 
+```sh
+sh ./scripts/build.sh server
+```
+
+or to build everything
+
+```sh
+sh ./scripts/build.sh all
+```
+
 ## Features
 
 - [x] find a name for the project

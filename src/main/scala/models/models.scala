@@ -196,7 +196,7 @@ case class GetServiceCommand(command: String, serviceId: String) extends Command
   override def applyModification(store: Store): Json = {
     store.get().values.flatten.toSeq.find(_.id == serviceId) match {
       case Some(service) => Encoders.ServiceEncoder(service)
-      case None => Json.obj("error" -> Json.fromString("not found"))
+      case None          => Json.obj("error" -> Json.fromString("not found"))
     }
   }
 }
