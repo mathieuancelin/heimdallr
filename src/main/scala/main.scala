@@ -3,10 +3,9 @@ import org.slf4j.LoggerFactory
 import java.io.File;
 
 object Main {
-  
 
   def watchFile(file: File)(f: File => Unit): Unit = {
-    
+
     import org.apache.commons.io.monitor.FileAlterationListener;
     import org.apache.commons.io.monitor.FileAlterationListenerAdaptor;
     import org.apache.commons.io.monitor.FileAlterationMonitor;
@@ -17,7 +16,7 @@ object Main {
     val listener = new FileAlterationListenerAdaptor() {
       override def onFileChange(changedFile: File) {
         if (changedFile.getAbsolutePath == file.getAbsolutePath) {
-          f(file)          
+          f(file)
         }
       }
     }
@@ -96,11 +95,11 @@ object Main {
         Proxy.fromConfigPath(path) match {
           case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
           case Right(proxy) => {
-            val configFile = new File(path)
+            val configFile   = new File(path)
             val startedProxy = proxy.copy(modules = modules.Modules.defaultModules).start().stopOnShutdown()
-            watchFile(configFile) { f => 
+            watchFile(configFile) { f =>
               Proxy.readProxyConfigFromFile(configFile, true) match {
-                case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
+                case Left(e)       => logger.error(s"Error while loading config file @ $path: $e")
                 case Right(config) => startedProxy.updateState(_ => config.services)
               }
             }
@@ -112,11 +111,11 @@ object Main {
         Proxy.fromConfigPath(path) match {
           case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
           case Right(proxy) => {
-            val configFile = new File(path)
+            val configFile   = new File(path)
             val startedProxy = proxy.copy(modules = modules.Modules.defaultModules).start().stopOnShutdown()
-            watchFile(configFile) { f => 
+            watchFile(configFile) { f =>
               Proxy.readProxyConfigFromFile(configFile, true) match {
-                case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
+                case Left(e)       => logger.error(s"Error while loading config file @ $path: $e")
                 case Right(config) => startedProxy.updateState(_ => config.services)
               }
             }

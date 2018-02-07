@@ -145,7 +145,7 @@ object Proxy {
     }
   }
   def readProxyConfigFromFile(file: File, reload: Boolean = false): Either[ConfigError, ProxyConfig] = {
-    if (reload) 
+    if (reload)
       logger.info(s"Reloading configuration from file @ ${file.toPath.toString}")
     else
       logger.info(s"Loading configuration from file @ ${file.toPath.toString}")

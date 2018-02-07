@@ -18,17 +18,19 @@ sh ./scripts/build.sh all
 
 ## Features
 
-- [x] find a name for the project
-- [x] admin API complete on another port. Add service to serve this api
-- [x] api based on diff commands
 - [ ] write some usage docs in readme
 - [ ] built-in kafka support as commands input
 - [ ] built-in kafka support as logs output
 - [ ] statsd support (include metrics in statsd actor for REST metrics)
 - [ ] dynamic TLS
-- [x] scan config file for changes and reload
 - [ ] cleaner call to modules
 - [ ] handle serde calls for services with pluggables modules
+- [ ] otoroshi config poll module
+- [ ] otoroshi compatibility module set
+- [x] find a name for the project
+- [x] admin API complete on another port. Add service to serve this api
+- [x] api based on diff commands
+- [x] scan config file for changes and reload
 - [x] docker dev
 - [x] session.sh
 - [x] build.sh
