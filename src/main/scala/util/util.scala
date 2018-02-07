@@ -325,9 +325,6 @@ trait Startable[A] {
 
 trait Stoppable[A] {
   def stop(): Unit
-  def stopOnShutdown(): Unit = {
-    Runtime.getRuntime.addShutdownHook(new Thread(() => stop()))
-  }
 }
 
 case object CloseMessage

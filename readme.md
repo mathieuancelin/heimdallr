@@ -21,17 +21,19 @@ sh ./scripts/build.sh all
 - [x] find a name for the project
 - [x] admin API complete on another port. Add service to serve this api
 - [x] api based on diff commands
-- [ ] write some docs in readme
+- [ ] write some usage docs in readme
 - [ ] built-in kafka support as commands input
 - [ ] built-in kafka support as logs output
 - [ ] statsd support (include metrics in statsd actor for REST metrics)
 - [ ] dynamic TLS
+- [x] scan config file for changes and reload
+- [ ] cleaner call to modules
+- [ ] handle serde calls for services with pluggables modules
 - [x] docker dev
 - [x] session.sh
 - [x] build.sh
-- [ ] travis.yml
-- [ ] upload on bintray
-- [ ] scan config file for changes and reload
+- [x] travis.yml
+- [x] upload on bintray
 - [x] API to change state of a Proxy instance
 - [x] API to get one service per command
 - [x] read API rest style to get services
@@ -67,8 +69,6 @@ sh ./scripts/build.sh all
 - [x] handle headers out manipulation with pluggable modules
 - [x] handle errors rendering with pluggable modules
 - [x] handle target set choice with pluggable modules
-- [ ] cleaner call to modules
-- [ ] handle serde calls for services with pluggables modules
 
 ## Missing from otoroshi
 

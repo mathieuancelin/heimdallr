@@ -39,7 +39,7 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
           case None          => FastFuture.successful(NotFound(s"Service with id $serviceId does not exist"))
         }
       }
-      case (HttpMethods.POST, Uri.Path("/command")) =>
+      case (HttpMethods.POST, Uri.Path("/api/_command")) =>
         request.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { bs =>
           val body = bs.utf8String
           io.circe.parser.parse(body) match {

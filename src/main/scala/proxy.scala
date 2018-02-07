@@ -68,6 +68,13 @@ case class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[
     jmxReporter.stop()
   }
 
+  def stopOnShutdown(): Proxy = {
+    sys.addShutdownHook {
+      stop()
+    }
+    this
+  }
+
   def updateState(f: Seq[Service] => Seq[Service]): Seq[Service] = {
     store.modify(m => f(m.values.toSeq.flatten).groupBy(_.domain)).values.toSeq.flatten
   }
@@ -133,6 +140,27 @@ object Proxy {
       case Right(json) =>
         Decoders.ProxyConfigDecoder.decodeJson(json) match {
           case Right(config) => Right(new Proxy(config, modules))
+          case Left(e)       => Left(ConfigError(e.message))
+        }
+    }
+  }
+  def readProxyConfigFromFile(file: File, reload: Boolean = false): Either[ConfigError, ProxyConfig] = {
+    if (reload) 
+      logger.info(s"Reloading configuration from file @ ${file.toPath.toString}")
+    else
+      logger.info(s"Loading configuration from file @ ${file.toPath.toString}")
+    val withLoader = ConfigParseOptions.defaults.setClassLoader(getClass.getClassLoader)
+    val conf = ConfigFactory
+      .systemProperties()
+      .withFallback(ConfigFactory.systemEnvironment())
+      .withFallback(ConfigFactory.parseFile(file, withLoader))
+      .resolve(ConfigResolveOptions.defaults)
+    val jsonConf = conf.root().render(ConfigRenderOptions.concise())
+    io.circe.parser.parse(jsonConf) match {
+      case Left(e) => Left(ConfigError(e.message))
+      case Right(json) =>
+        Decoders.ProxyConfigDecoder.decodeJson(json) match {
+          case Right(config) => Right(config)
           case Left(e)       => Left(ConfigError(e.message))
         }
     }

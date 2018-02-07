@@ -29,7 +29,8 @@ libraryDependencies ++= {
     "org.bouncycastle"       % "bcprov-jdk15on"      % "1.59",
     "org.bouncycastle"       % "bcpkix-jdk15on"      % "1.59",
     "org.bouncycastle"       % "bctls-jdk15on"       % "1.59",
-    "com.google.guava"       % "guava"               % "23.0"
+    "com.google.guava"       % "guava"               % "23.0",
+    "commons-io"     % "commons-io"          % "2.6"
   )
 }
 
