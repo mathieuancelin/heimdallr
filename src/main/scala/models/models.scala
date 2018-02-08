@@ -46,15 +46,18 @@ case class Service(id: String,
                    privatePatterns: Set[String] = Set.empty,
                    metadata: Map[String, String] = Map.empty)
 
+case class OtoroshiStateConfig(url: String, headers: Map[String, String], pollEvery: FiniteDuration = 10.seconds)
 case class LocalStateConfig(path: String, writeEvery: FiniteDuration = 10.seconds)
 case class RemoteStateConfig(url: String, headers: Map[String, String], pollEvery: FiniteDuration = 10.seconds)
 
 case class StateConfig(
     local: Option[LocalStateConfig] = None,
-    remote: Option[RemoteStateConfig] = None
+    remote: Option[RemoteStateConfig] = None,
+    otoroshi: Option[OtoroshiStateConfig] = None,
 ) {
-  def isRemote = remote.isDefined && local.isEmpty
-  def isLocal  = local.isDefined && remote.isEmpty
+  def isRemote   = remote.isDefined && local.isEmpty && otoroshi.isEmpty
+  def isLocal    = local.isDefined && remote.isEmpty && otoroshi.isEmpty
+  def isOtoroshi = otoroshi.isDefined && local.isEmpty && remote.isEmpty
 }
 
 case class HttpConfig(
@@ -66,6 +69,7 @@ case class HttpConfig(
     keyPath: Option[String] = None,
     certPass: Option[String] = None
 )
+
 case class ApiConfig(
     httpPort: Int = 9080,
     httpsPort: Int = 9443,
@@ -76,6 +80,7 @@ case class ApiConfig(
     certPass: Option[String] = None,
     enabled: Boolean = true
 )
+
 case class ModulesConfig(modules: Seq[_ <: Module] = Seq.empty) {
   lazy val PreconditionModules: Seq[PreconditionModule] = modules.collect {
     case m: PreconditionModule => m
@@ -97,13 +102,12 @@ case class ModulesConfig(modules: Seq[_ <: Module] = Seq.empty) {
   }
 }
 
-case class LoggersConfig(level: String)
+case class LoggersConfig(level: String, configPath: Option[String] = None)
 
 case class ProxyConfig(
     http: HttpConfig = HttpConfig(),
     api: ApiConfig = ApiConfig(),
     services: Seq[Service] = Seq.empty,
-    logConfigPath: Option[String] = None,
     state: Option[StateConfig] = None,
     loggers: LoggersConfig = LoggersConfig("INFO")
 ) {
@@ -121,18 +125,19 @@ object Decoders {
   implicit val HttpProtocolDecoder: Decoder[HttpProtocol] = new Decoder[HttpProtocol] {
     override def apply(c: HCursor): Result[HttpProtocol] = c.as[String].map(v => HttpProtocol(v))
   }
-  implicit val LocalStateConfigDecoder: Decoder[LocalStateConfig]   = deriveDecoder[LocalStateConfig]
-  implicit val RemoteStateConfigDecoder: Decoder[RemoteStateConfig] = deriveDecoder[RemoteStateConfig]
-  implicit val StateConfigDecoder: Decoder[StateConfig]             = deriveDecoder[StateConfig]
-  implicit val TargetDecoder: Decoder[Target]                       = deriveDecoder[Target]
-  implicit val ClientConfigDecoder: Decoder[ClientConfig]           = deriveDecoder[ClientConfig]
-  implicit val ApiKeyDecoder: Decoder[ApiKey]                       = deriveDecoder[ApiKey]
-  implicit val ServiceDecoder: Decoder[Service]                     = deriveDecoder[Service]
-  implicit val SeqOfServiceDecoder: Decoder[Seq[Service]]           = Decoder.decodeSeq(ServiceDecoder)
-  implicit val HttpConfigDecoder: Decoder[HttpConfig]               = deriveDecoder[HttpConfig]
-  implicit val ApiConfigDecoder: Decoder[ApiConfig]                 = deriveDecoder[ApiConfig]
-  implicit val LoggersConfigDecoder: Decoder[LoggersConfig]         = deriveDecoder[LoggersConfig]
-  implicit val ProxyConfigDecoder: Decoder[ProxyConfig]             = deriveDecoder[ProxyConfig]
+  implicit val OtoroshiStateConfigDecoder: Decoder[OtoroshiStateConfig] = deriveDecoder[OtoroshiStateConfig]
+  implicit val LocalStateConfigDecoder: Decoder[LocalStateConfig]       = deriveDecoder[LocalStateConfig]
+  implicit val RemoteStateConfigDecoder: Decoder[RemoteStateConfig]     = deriveDecoder[RemoteStateConfig]
+  implicit val StateConfigDecoder: Decoder[StateConfig]                 = deriveDecoder[StateConfig]
+  implicit val TargetDecoder: Decoder[Target]                           = deriveDecoder[Target]
+  implicit val ClientConfigDecoder: Decoder[ClientConfig]               = deriveDecoder[ClientConfig]
+  implicit val ApiKeyDecoder: Decoder[ApiKey]                           = deriveDecoder[ApiKey]
+  implicit val ServiceDecoder: Decoder[Service]                         = deriveDecoder[Service]
+  implicit val SeqOfServiceDecoder: Decoder[Seq[Service]]               = Decoder.decodeSeq(ServiceDecoder)
+  implicit val HttpConfigDecoder: Decoder[HttpConfig]                   = deriveDecoder[HttpConfig]
+  implicit val ApiConfigDecoder: Decoder[ApiConfig]                     = deriveDecoder[ApiConfig]
+  implicit val LoggersConfigDecoder: Decoder[LoggersConfig]             = deriveDecoder[LoggersConfig]
+  implicit val ProxyConfigDecoder: Decoder[ProxyConfig]                 = deriveDecoder[ProxyConfig]
 }
 
 object Encoders {
@@ -145,18 +150,19 @@ object Encoders {
   implicit val HttpProtocolEncoder: Encoder[HttpProtocol] = new Encoder[HttpProtocol] {
     override def apply(a: HttpProtocol): Json = Json.fromString(a.value)
   }
-  implicit val LocalStateConfigEncoder: Encoder[LocalStateConfig]   = deriveEncoder[LocalStateConfig]
-  implicit val RemoteStateConfigEncoder: Encoder[RemoteStateConfig] = deriveEncoder[RemoteStateConfig]
-  implicit val StateConfigEncoder: Encoder[StateConfig]             = deriveEncoder[StateConfig]
-  implicit val TargetEncoder: Encoder[Target]                       = deriveEncoder[Target]
-  implicit val ClientConfigEncoder: Encoder[ClientConfig]           = deriveEncoder[ClientConfig]
-  implicit val ApiKeyEncoder: Encoder[ApiKey]                       = deriveEncoder[ApiKey]
-  implicit val ServiceEncoder: Encoder[Service]                     = deriveEncoder[Service]
-  implicit val SeqOfServiceEncoder: Encoder[Seq[Service]]           = Encoder.encodeSeq(ServiceEncoder)
-  implicit val HttpConfigEncoder: Encoder[HttpConfig]               = deriveEncoder[HttpConfig]
-  implicit val ApiConfigEncoder: Encoder[ApiConfig]                 = deriveEncoder[ApiConfig]
-  implicit val LoggersConfigEncoder: Encoder[LoggersConfig]         = deriveEncoder[LoggersConfig]
-  implicit val ProxyConfigEncoder: Encoder[ProxyConfig]             = deriveEncoder[ProxyConfig]
+  implicit val OtoroshiStateConfigEncoder: Encoder[OtoroshiStateConfig] = deriveEncoder[OtoroshiStateConfig]
+  implicit val LocalStateConfigEncoder: Encoder[LocalStateConfig]       = deriveEncoder[LocalStateConfig]
+  implicit val RemoteStateConfigEncoder: Encoder[RemoteStateConfig]     = deriveEncoder[RemoteStateConfig]
+  implicit val StateConfigEncoder: Encoder[StateConfig]                 = deriveEncoder[StateConfig]
+  implicit val TargetEncoder: Encoder[Target]                           = deriveEncoder[Target]
+  implicit val ClientConfigEncoder: Encoder[ClientConfig]               = deriveEncoder[ClientConfig]
+  implicit val ApiKeyEncoder: Encoder[ApiKey]                           = deriveEncoder[ApiKey]
+  implicit val ServiceEncoder: Encoder[Service]                         = deriveEncoder[Service]
+  implicit val SeqOfServiceEncoder: Encoder[Seq[Service]]               = Encoder.encodeSeq(ServiceEncoder)
+  implicit val HttpConfigEncoder: Encoder[HttpConfig]                   = deriveEncoder[HttpConfig]
+  implicit val ApiConfigEncoder: Encoder[ApiConfig]                     = deriveEncoder[ApiConfig]
+  implicit val LoggersConfigEncoder: Encoder[LoggersConfig]             = deriveEncoder[LoggersConfig]
+  implicit val ProxyConfigEncoder: Encoder[ProxyConfig]                 = deriveEncoder[ProxyConfig]
 }
 
 sealed trait WithApiKeyOrNot

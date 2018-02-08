@@ -25,7 +25,7 @@ sh ./scripts/build.sh all
 - [ ] dynamic TLS
 - [ ] cleaner call to modules
 - [ ] handle serde calls for services with pluggables modules
-- [ ] otoroshi config poll module
+- [x] otoroshi config poll module
 - [ ] otoroshi compatibility module set
 - [x] find a name for the project
 - [x] admin API complete on another port. Add service to serve this api

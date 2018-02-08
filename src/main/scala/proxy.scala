@@ -37,7 +37,7 @@ case class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[
 
   private def setupLoggers(): Unit = {
     val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
-    config.logConfigPath.foreach { path =>
+    config.loggers.configPath.foreach { path =>
       loggerContext.reset()
       val configurator = new JoranConfigurator
       val configStream = new FileInputStream(new File(path))
