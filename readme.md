@@ -149,7 +149,7 @@ docker run -d -p "8083:80" emilevauge/whoami
 - [ ] built-in kafka support as logs output
 - [ ] statsd support (include metrics in statsd actor for REST metrics)
 - [ ] dynamic TLS
-- [ ] handle serde calls for services with pluggables modules
+- [-] handle serde calls for services with pluggables modules
 - [x] otoroshi config poll module
 - [x] find a name for the project
 - [x] admin API complete on another port. Add service to serve this api
