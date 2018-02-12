@@ -28,7 +28,11 @@ import io.heimdallr.Proxy
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    val proxy = Proxy.fromConfigPath("./heimdallr.conf").stopOnShutdown()
+    Proxy
+      .fromConfigPath("./heimdallr.conf") match {
+        case Left(e) => println(s"error while parsing config. $e")
+        case Right(proxy) => proxy.stopOnShutdown()
+      }
   }
 } 
 
@@ -41,7 +45,11 @@ import java.io.File
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    val proxy = Proxy.fromConfigPath("https://foo.bar/heimdallr.conf").stopOnShutdown()
+    Proxy
+      .fromConfigPath("https://foo.bar/heimdallr.conf") match {
+        case Left(e) => println(s"error while parsing config. $e")
+        case Right(proxy) => proxy.stopOnShutdown()
+      }
   }
 }
 
@@ -53,7 +61,11 @@ import io.heimdallr.Proxy
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    val proxy = Proxy.fromConfigFile(new File("./heimdallr.conf")).stopOnShutdown()
+    Proxy
+      .fromConfigFile(new File("./heimdallr.conf")) match {
+        case Left(e) => println(s"error while parsing config. $e")
+        case Right(proxy) => proxy.stopOnShutdown()
+      }
   }
 }
 
@@ -98,7 +110,82 @@ object MyOwnProxy {
     )).stopOnShutdown()
   }
 }
+```
 
+## Modules
+
+Heimdallr provides extension points to add new feature on top of basic http proxies
+
+```scala
+def withConfig(config: ProxyConfig, modules: ModulesConfig = Modules.defaultModules): Proxy
+def fromConfigPath(path: String, modules: ModulesConfig = Modules.defaultModules): Either[ConfigError, Proxy]
+def fromConfigFile(file: File, modules: ModulesConfig = Modules.defaultModules): Either[ConfigError, Proxy]
+```
+
+modules includes the following possibilities 
+
+```scala
+
+// can handle construction mode, maintenance mode
+trait PreconditionModule extends Module {
+  def validatePreconditions(reqId: String, service: Service, request: HttpRequest): Either[HttpResponse, Unit]
+}
+
+// can handle pass by api, pass by auth0, throttling, gobal throtthling, etc ...
+trait ServiceAccessModule extends Module {
+  def access(reqId: String, service: Service, request: HttpRequest): WithApiKeyOrNot
+}
+
+// can handle headers additions, like JWT header, request id, API quotas, etc ... to target
+trait HeadersInTransformationModule extends Module {
+  def transform(reqId: String,
+                host: String,
+                service: Service,
+                target: Target,
+                request: HttpRequest,
+                waon: WithApiKeyOrNot,
+                headers: List[HttpHeader]): List[HttpHeader]
+}
+
+// can handle headers additions, like, API quotas, etc ... on target responses
+trait HeadersOutTransformationModule extends Module {
+  def transform(reqId: String,
+                host: String,
+                service: Service,
+                target: Target,
+                request: HttpRequest,
+                waon: WithApiKeyOrNot,
+                proxyLatency: Long,
+                targetLatency: Long,
+                headers: List[HttpHeader]): List[HttpHeader]
+}
+
+// can handle custom template errors
+trait ErrorRendererModule extends Module {
+  def render(reqId: String, status: Int, message: String, service: Option[Service], request: HttpRequest): HttpResponse
+}
+
+// can handle canary mode
+trait TargetSetChooserModule extends Module {
+  def choose(reqId: String, service: Service, request: HttpRequest): Seq[Target]
+}
+````
+
+`Modules.defaultModules` provides the following features
+
+```scala
+object Modules {
+  val defaultModules: ModulesConfig = ModulesConfig(
+    Seq(
+      new DefaultPreconditionModule(), // return error if service is not enabled
+      new DefaultServiceAccessModule(), // handle access by ApiKey using various headers
+      new DefaultHeadersInTransformationModule(), // add new headers on request like X-Request-Id, X-Fowarded-Host, X-Fowarded-Scheme
+      new DefaultHeadersOutTransformationModule(), // add new headers on response like X-Proxy-Latency, X-Target-Latency
+      new DefaultErrorRendererModule(), // return errors as json responses
+      new DefaultTargetSetChooserModule(), // use service targets
+    )
+  )
+}
 ```
 
 ## Build it
