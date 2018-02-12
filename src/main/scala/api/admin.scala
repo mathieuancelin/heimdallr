@@ -1,4 +1,4 @@
-package api
+package io.heimdallr.api
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -8,11 +8,11 @@ import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import com.codahale.metrics.MetricRegistry
 import io.circe.Json
-import models._
+import io.heimdallr.models._
+import io.heimdallr.store.Store
+import io.heimdallr.util.HttpResponses._
+import io.heimdallr.util.{HttpsSupport, Startable, Stoppable}
 import org.slf4j.LoggerFactory
-import store.Store
-import util.HttpResponses._
-import util.{HttpsSupport, Startable, Stoppable}
 
 import scala.concurrent.Future
 

@@ -1,3 +1,5 @@
+package io.heimdallr
+
 import java.io.{File, FileInputStream}
 import java.util.concurrent.TimeUnit
 
@@ -6,18 +8,18 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpMethods, HttpRequest, Uri}
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
-import api.AdminApi
+import io.heimdallr.api.AdminApi
 import ch.qos.logback.classic.{Level, LoggerContext}
 import ch.qos.logback.classic.joran.JoranConfigurator
 import com.codahale.metrics.MetricRegistry
 import com.codahale.metrics.jmx.JmxReporter
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigRenderOptions, ConfigResolveOptions}
-import models._
-import modules.Modules
+import io.heimdallr.models._
+import io.heimdallr.modules.Modules
 import org.slf4j.LoggerFactory
-import proxies.HttpProxy
-import store.Store
-import util.{Startable, Stoppable}
+import io.heimdallr.proxies.HttpProxy
+import io.heimdallr.store.Store
+import io.heimdallr.util.{Startable, Stoppable}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._

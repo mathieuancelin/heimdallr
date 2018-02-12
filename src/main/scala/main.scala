@@ -1,4 +1,6 @@
-import models.{ApiKey, ProxyConfig, Service, Target}
+package io.heimdallr
+
+import io.heimdallr.models.{ApiKey, ProxyConfig, Service, Target}
 import org.slf4j.LoggerFactory
 import java.io.File;
 

@@ -1,4 +1,4 @@
-package modules
+package io.heimdallr.modules
 
 import java.util.Base64
 
@@ -7,8 +7,8 @@ import akka.http.scaladsl.model.headers.RawHeader
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import io.circe.Json
-import models._
-import util.Implicits._
+import io.heimdallr.models._
+import io.heimdallr.util.Implicits._
 
 import scala.util.Try
 

@@ -1,4 +1,4 @@
-package store
+package io.heimdallr.store
 
 import java.io.File
 import java.nio.file.{Files, Paths}
@@ -13,9 +13,9 @@ import akka.stream._
 import akka.util.ByteString
 import com.codahale.metrics.MetricRegistry
 import io.circe.{Decoder, Encoder, HCursor, Json}
-import models._
+import io.heimdallr.models._
 import org.slf4j.LoggerFactory
-import util.{Startable, Stoppable}
+import io.heimdallr.util.{Startable, Stoppable}
 
 import scala.concurrent._
 import scala.concurrent.duration._

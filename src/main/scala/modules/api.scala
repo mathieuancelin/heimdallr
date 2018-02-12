@@ -1,8 +1,8 @@
-package modules
+package io.heimdallr.modules
 
 import akka.http.scaladsl.model._
 import io.circe.Json
-import models._
+import io.heimdallr.models._
 
 trait Module {
   def id: String

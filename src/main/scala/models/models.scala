@@ -1,4 +1,4 @@
-package models
+package io.heimdallr.models
 
 import java.util.concurrent.TimeUnit
 
@@ -6,9 +6,9 @@ import akka.http.scaladsl.model._
 import io.circe.Decoder.Result
 import io.circe._
 import io.circe.generic.semiauto._
-import modules._
-import store.Store
-import util.IdGenerator
+import io.heimdallr.modules._
+import io.heimdallr.store.Store
+import io.heimdallr.util.IdGenerator
 
 import scala.concurrent.duration._
 
@@ -116,7 +116,7 @@ case class ProxyConfig(
 
 object Decoders {
 
-  import models.Decoders._
+  import io.heimdallr.models.Decoders._
 
   implicit val FiniteDurationDecoder: Decoder[FiniteDuration] = new Decoder[FiniteDuration] {
     override def apply(c: HCursor): Result[FiniteDuration] =
@@ -142,7 +142,7 @@ object Decoders {
 
 object Encoders {
 
-  import models.Encoders._
+  import io.heimdallr.models.Encoders._
 
   implicit val FiniteDurationEncoder: Encoder[FiniteDuration] = new Encoder[FiniteDuration] {
     override def apply(a: FiniteDuration): Json = Json.fromLong(a.toMillis)
@@ -584,7 +584,7 @@ case class RemoveRootCommand(command: String, serviceId: String) extends Command
 
 object Command {
 
-  import models.Decoders._
+  import io.heimdallr.models.Decoders._
 
   val AddServiceCommandDecoder: Decoder[AddServiceCommand]                   = deriveDecoder[AddServiceCommand]
   val UpdateServiceCommandDecoder: Decoder[UpdateServiceCommand]             = deriveDecoder[UpdateServiceCommand]

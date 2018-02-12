@@ -1,4 +1,4 @@
-package proxies
+package io.heimdallr.proxies
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -14,11 +14,11 @@ import akka.http.scaladsl.util.FastFuture
 import akka.pattern.CircuitBreaker
 import akka.stream.ActorMaterializer
 import com.codahale.metrics.MetricRegistry
-import models.{WithApiKeyOrNot, _}
-import modules._
+import io.heimdallr.models.{WithApiKeyOrNot, _}
+import io.heimdallr.modules._
+import io.heimdallr.store.Store
+import io.heimdallr.util._
 import org.slf4j.LoggerFactory
-import store.Store
-import util._
 
 import scala.concurrent.{Future, TimeoutException}
 import scala.util.Success

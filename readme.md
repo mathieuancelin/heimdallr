@@ -2,7 +2,104 @@
 
 Experimental project to try new things on http reverse proxies. Do not use in production ... yet, or not ;)
 
-## Use it
+## Get it
+
+you can fetch the last Heimdallr build from bintray an run it
+
+```sh
+wget -q --show-progress https://dl.bintray.com/mathieuancelin/heimdallr/heimdallr.jar/snapshot/heimdallr.jar
+java -jar heimdallr.jar --proxy-config=/path/to/heimdallr.conf
+```
+
+or you can use the latest Docker image
+
+```sh
+docker run -p "8080:8080"  mathieuancelin-docker-heimdallr-docker.bintray.io/heimdallr:latest
+```
+
+## Use it from code
+
+Heimdallr is designed to be embedded and enhanced through pluggable modules
+
+
+```scala
+import io.heimdallr.Proxy
+
+object MyOwnProxy {
+
+  def main(args: Array[String]): Unit = {
+    val proxy = Proxy.fromConfigPath("./heimdallr.").stopOnShutdown()
+  }
+} 
+
+```
+
+```scala
+import io.heimdallr.Proxy
+import java.io.File
+
+object MyOwnProxy {
+
+  def main(args: Array[String]): Unit = {
+    val proxy = Proxy.fromConfigPath("https://foo.bar/heimdallr.").stopOnShutdown()
+  }
+}
+
+```
+
+```scala
+import io.heimdallr.Proxy
+
+object MyOwnProxy {
+
+  def main(args: Array[String]): Unit = {
+    val proxy = Proxy.fromConfigFile(new File("./heimdallr.")).stopOnShutdown()
+  }
+}
+
+```
+
+```scala
+import io.heimdallr.Proxy
+import io.heimdallr.models._
+
+object MyOwnProxy {
+
+  def main(args: Array[String]): Unit = {
+    val proxy = Proxy.withConfig(ProxyConfig(
+      http = HttpConfig(
+        httpPort = 8080,
+        httpsPort = 8443,
+        listenOn = "0.0.0.0",
+      ),
+      api = ApiConfig(
+        httpPort = 9080,
+        httpsPort = 9443,
+        listenOn = "127.0.0.1",
+        certPath = Some("./cert/foo.bar-cert.pem"),
+        keyPath = Some("./cert.foo.bar-key.pem"),
+        certPass = Some("foo")
+      ),
+      services = Seq(
+        Service(
+          id = "load-balancing-test",
+          domain = "test.foo.bar",
+          targets = Seq(
+            Target("http://127.0.0.1:8081"),
+            Target("http://127.0.0.1:8082"),
+            Target("http://127.0.0.1:8083")
+          ),
+          additionalHeaders = Map(
+            "Authorization" -> "basic 1234"
+          ),
+          publicPatterns = Set("/*")
+        )
+      )
+    )).stopOnShutdown()
+  }
+}
+
+```
 
 ## Build it
 
@@ -18,7 +115,7 @@ sh ./scripts/build.sh all
 
 ## Features
 
-- [ ] write some usage docs in readme
+- [x] write some usage docs in readme
 - [ ] built-in kafka support as commands input
 - [ ] built-in kafka support as logs output
 - [ ] statsd support (include metrics in statsd actor for REST metrics)

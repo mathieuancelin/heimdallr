@@ -1,4 +1,4 @@
-package util
+package io.heimdallr.util
 
 import java.io.{File, FileInputStream, InputStream}
 import java.net.Socket

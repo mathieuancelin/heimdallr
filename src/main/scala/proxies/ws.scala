@@ -1,4 +1,4 @@
-package proxies
+package io.heimdallr.proxies
 
 import java.util.concurrent.atomic.AtomicReference
 
@@ -9,7 +9,7 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source, SourceQueueWithComplete}
 import akka.stream.{Materializer, OverflowStrategy}
 import akka.util.ByteString
 import org.slf4j.LoggerFactory
-import util.CloseMessage
+import io.heimdallr.util.CloseMessage
 
 import scala.util.{Failure, Success}
 

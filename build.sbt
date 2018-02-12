@@ -36,9 +36,9 @@ libraryDependencies ++= {
 
 javaAgents += "org.mortbay.jetty.alpn" % "jetty-alpn-agent" % "2.0.6" % "runtime"
 
-mainClass in Compile := Some("Main")
-mainClass in reStart := Some("Main")
-mainClass in assembly := Some("Main")
+mainClass in Compile := Some("io.heimdallr.Main")
+mainClass in reStart := Some("io.heimdallr.Main")
+mainClass in assembly := Some("io.heimdallr.Main")
 
 assemblyJarName in assembly := "heimdallr.jar"
 test in assembly := {}

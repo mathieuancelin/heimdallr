@@ -1,5 +1,5 @@
 /*
-package kafka
+package io.heimdallr.kafka
 
 import akka.Done
 import akka.actor.{Actor, ActorSystem, Props}
