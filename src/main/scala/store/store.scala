@@ -282,8 +282,8 @@ object OtoroshiStateFetch {
                     _env              <- c.downField("env").as[String]
                     id                <- c.downField("id").as[String]
                     groupId           <- c.downField("groupId").as[String]
-                    root              <- c.downField("matchingRoot").as[Option[String]] // TODO : ???
-                    targetRoot        <- c.downField("root").as[String] // TODO : ???
+                    root              <- c.downField("matchingRoot").as[Option[String]]
+                    targetRoot        <- c.downField("root").as[String]
                     enabled           <- c.downField("enabled").as[Boolean]
                     metadata          <- c.downField("metadata").as[Map[String, String]]
                     additionalHeaders <- c.downField("additionalHeaders").as[Map[String, String]]

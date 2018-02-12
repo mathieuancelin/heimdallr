@@ -23,10 +23,8 @@ sh ./scripts/build.sh all
 - [ ] built-in kafka support as logs output
 - [ ] statsd support (include metrics in statsd actor for REST metrics)
 - [ ] dynamic TLS
-- [ ] cleaner call to modules
 - [ ] handle serde calls for services with pluggables modules
 - [x] otoroshi config poll module
-- [ ] otoroshi compatibility module set
 - [x] find a name for the project
 - [x] admin API complete on another port. Add service to serve this api
 - [x] api based on diff commands
@@ -71,25 +69,6 @@ sh ./scripts/build.sh all
 - [x] handle headers out manipulation with pluggable modules
 - [x] handle errors rendering with pluggable modules
 - [x] handle target set choice with pluggable modules
-
-## Missing from otoroshi
-
-* [x] service enabled
-* [ ] private mode
-* [ ] maintenance mode
-* [ ] build mode
-* [ ] force https mode
-* [ ] secure mode mode
-* [ ] pass apikey by custom headers
-* [ ] header name custom values from config
-* [ ] api quotas
-* [ ] api throttling
-* [ ] global throttling
-* [ ] canary mode
-* [ ] custom templates
-* [ ] push api usage back
-* [ ] alerts
-* [ ] push alerts back
 
 ## Helpers
 
