@@ -113,6 +113,35 @@ or to build everything
 sh ./scripts/build.sh all
 ```
 
+## Helpers
+
+for http2
+
+```sh
+sbt 
+~reStart --- -javaagent:/Users/mathieuancelin/.ivy2/cache/org.mortbay.jetty.alpn/jetty-alpn-agent/jars/jetty-alpn-agent-2.0.6.jar
+
+curl2 -k -H 'Host: test.foo.bar' https://127.0.0.1:8443 --include
+curl2 -k --http2-H 'Host: test.foo.bar' https://127.0.0.1:8443 --include
+curl2 -k -v -H 'Host: test.foo.bar' https://127.0.0.1:8443 --include
+```
+
+```sh
+wrk -t1 -c1 -d20s -H "Host: test.foo.bar" http://127.0.0.1:8080/ >> /dev/null
+wrk -t2 -c200 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8080/
+```
+
+```sh
+docker kill $(docker ps -q)
+docker run -d -p "8081:80" emilevauge/whoami
+docker run -d -p "8082:80" emilevauge/whoami
+docker run -d -p "8083:80" emilevauge/whoami
+```
+
+## Waiting for 
+
+* https://github.com/akka/akka-http/pull/1735
+
 ## Features
 
 - [x] write some usage docs in readme
@@ -166,32 +195,3 @@ sh ./scripts/build.sh all
 - [x] handle headers out manipulation with pluggable modules
 - [x] handle errors rendering with pluggable modules
 - [x] handle target set choice with pluggable modules
-
-## Helpers
-
-for http2
-
-```sh
-sbt 
-~reStart --- -javaagent:/Users/mathieuancelin/.ivy2/cache/org.mortbay.jetty.alpn/jetty-alpn-agent/jars/jetty-alpn-agent-2.0.6.jar
-
-curl2 -k -H 'Host: test.foo.bar' https://127.0.0.1:8443 --include
-curl2 -k --http2-H 'Host: test.foo.bar' https://127.0.0.1:8443 --include
-curl2 -k -v -H 'Host: test.foo.bar' https://127.0.0.1:8443 --include
-```
-
-```sh
-wrk -t1 -c1 -d20s -H "Host: test.foo.bar" http://127.0.0.1:8080/ >> /dev/null
-wrk -t2 -c200 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8080/
-```
-
-```sh
-docker kill $(docker ps -q)
-docker run -d -p "8081:80" emilevauge/whoami
-docker run -d -p "8082:80" emilevauge/whoami
-docker run -d -p "8083:80" emilevauge/whoami
-```
-
-## Waiting for 
-
-* https://github.com/akka/akka-http/pull/1735
