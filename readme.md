@@ -28,7 +28,7 @@ import io.heimdallr.Proxy
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    val proxy = Proxy.fromConfigPath("./heimdallr.").stopOnShutdown()
+    val proxy = Proxy.fromConfigPath("./heimdallr.conf").stopOnShutdown()
   }
 } 
 
@@ -41,7 +41,7 @@ import java.io.File
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    val proxy = Proxy.fromConfigPath("https://foo.bar/heimdallr.").stopOnShutdown()
+    val proxy = Proxy.fromConfigPath("https://foo.bar/heimdallr.conf").stopOnShutdown()
   }
 }
 
@@ -53,7 +53,7 @@ import io.heimdallr.Proxy
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    val proxy = Proxy.fromConfigFile(new File("./heimdallr.")).stopOnShutdown()
+    val proxy = Proxy.fromConfigFile(new File("./heimdallr.conf")).stopOnShutdown()
   }
 }
 
