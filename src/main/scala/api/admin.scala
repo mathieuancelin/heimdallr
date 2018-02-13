@@ -62,7 +62,7 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
     config.api.certPath.foreach { path =>
       val httpsContext =
         HttpsSupport.context(path, config.api.keyPath, config.api.certPass.get, config.api.keyStoreType)
-      logger.info(s"Listening for admin commands on https://${config.api.listenOn}:${config.api.httpsPort}")
+      logger.info(s"Listening for api commands on https://${config.api.listenOn}:${config.api.httpsPort}")
       http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpsPort, connectionContext = httpsContext)
     }
     this

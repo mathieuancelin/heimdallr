@@ -269,7 +269,7 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metri
     config.http.certPath.foreach { path =>
       val httpsContext =
         HttpsSupport.context(path, config.http.keyPath, config.http.certPass.get, config.http.keyStoreType)
-      logger.info(s"Listening for http calls on https://${config.http.listenOn}:${config.http.httpsPort}")
+      logger.info(s"Listening for https calls on https://${config.http.listenOn}:${config.http.httpsPort}")
       http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpsPort, connectionContext = httpsContext)
     }
     this
