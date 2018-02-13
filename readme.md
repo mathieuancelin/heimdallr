@@ -30,11 +30,10 @@ import io.heimdallr.Proxy
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    Proxy
-      .fromConfigPath("./heimdallr.conf") match {
-        case Left(e) => println(s"error while parsing config. $e")
-        case Right(proxy) => proxy.stopOnShutdown()
-      }
+    Proxy.fromConfigPath("./heimdallr.conf") match {
+      case Left(e) => println(s"error while parsing config. $e")
+      case Right(proxy) => proxy.stopOnShutdown()
+    }
   }
 } 
 
@@ -47,11 +46,10 @@ import java.io.File
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    Proxy
-      .fromConfigPath("https://foo.bar/heimdallr.conf") match {
-        case Left(e) => println(s"error while parsing config. $e")
-        case Right(proxy) => proxy.stopOnShutdown()
-      }
+    Proxy.fromConfigPath("https://foo.bar/heimdallr.conf") match {
+      case Left(e) => println(s"error while parsing config. $e")
+      case Right(proxy) => proxy.stopOnShutdown()
+    }
   }
 }
 
@@ -63,11 +61,10 @@ import io.heimdallr.Proxy
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    Proxy
-      .fromConfigFile(new File("./heimdallr.conf")) match {
-        case Left(e) => println(s"error while parsing config. $e")
-        case Right(proxy) => proxy.stopOnShutdown()
-      }
+    Proxy.fromConfigFile(new File("./heimdallr.conf")) match {
+      case Left(e) => println(s"error while parsing config. $e")
+      case Right(proxy) => proxy.stopOnShutdown()
+    }
   }
 }
 
@@ -178,7 +175,7 @@ trait TargetSetChooserModule extends Module {
 ```scala
 DefaultPreconditionModule // return error if service is not enabled
 DefaultServiceAccessModule // handle access by ApiKey using various headers
-DefaultHeadersInTransformationModule // add new headers on request like X-Request-Id, X-Fowarded-Host, X-Fowarded-Scheme
+DefaultHeadersInTransformationModule // add new headers on request like X-Request-Id, X-Fowarded-Host, X-Fowarded-Scheme and custom headers
 DefaultHeadersOutTransformationModule // add new headers on response like X-Proxy-Latency, X-Target-Latency
 DefaultErrorRendererModule // return errors as json responses
 DefaultTargetSetChooserModule // use service targets for loadbalancing
@@ -235,7 +232,6 @@ docker run -d -p "8083:80" emilevauge/whoami
 - [ ] dynamic TLS
 - [ ] add extra typesafe attributes to services and apikey for modules ???
 - [ ] handle wildcard matching hosts
-- [-] handle serde calls for services with pluggables modules
 - [x] otoroshi config poll module
 - [x] find a name for the project
 - [x] admin API complete on another port. Add service to serve this api
