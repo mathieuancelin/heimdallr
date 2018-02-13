@@ -1,5 +1,7 @@
 # Heimdallr
 
+A library to build modern http reverse proxies. By default supports http/http2, TLS terminaison, circuit breaker, retry, weighted round robin load balancing, api key access, etc .... Provides a pluggable module system to add new features easily.
+
 Experimental project to try new things on http reverse proxies. Do not use in production ... yet, or not ;)
 
 ## Get it
@@ -174,18 +176,12 @@ trait TargetSetChooserModule extends Module {
 `Modules.defaultModules` provides the following features
 
 ```scala
-object Modules {
-  val defaultModules: ModulesConfig = ModulesConfig(
-    Seq(
-      new DefaultPreconditionModule(), // return error if service is not enabled
-      new DefaultServiceAccessModule(), // handle access by ApiKey using various headers
-      new DefaultHeadersInTransformationModule(), // add new headers on request like X-Request-Id, X-Fowarded-Host, X-Fowarded-Scheme
-      new DefaultHeadersOutTransformationModule(), // add new headers on response like X-Proxy-Latency, X-Target-Latency
-      new DefaultErrorRendererModule(), // return errors as json responses
-      new DefaultTargetSetChooserModule(), // use service targets
-    )
-  )
-}
+DefaultPreconditionModule // return error if service is not enabled
+DefaultServiceAccessModule // handle access by ApiKey using various headers
+DefaultHeadersInTransformationModule // add new headers on request like X-Request-Id, X-Fowarded-Host, X-Fowarded-Scheme
+DefaultHeadersOutTransformationModule // add new headers on response like X-Proxy-Latency, X-Target-Latency
+DefaultErrorRendererModule // return errors as json responses
+DefaultTargetSetChooserModule // use service targets for loadbalancing
 ```
 
 ## Build it
@@ -227,7 +223,8 @@ docker run -d -p "8083:80" emilevauge/whoami
 
 ## Waiting for 
 
-* https://github.com/akka/akka-http/pull/1735
+* https://github.com/akka/akka-http/issues/1843
+* https://github.com/akka/akka-http/issues/530
 
 ## Features
 
@@ -236,6 +233,8 @@ docker run -d -p "8083:80" emilevauge/whoami
 - [ ] built-in kafka support as logs output
 - [ ] statsd support (include metrics in statsd actor for REST metrics)
 - [ ] dynamic TLS
+- [ ] add extra typesafe attributes to services and apikey for modules ???
+- [ ] handle wildcard matching hosts
 - [-] handle serde calls for services with pluggables modules
 - [x] otoroshi config poll module
 - [x] find a name for the project
