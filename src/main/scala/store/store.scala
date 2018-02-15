@@ -14,6 +14,7 @@ import akka.util.ByteString
 import com.codahale.metrics.MetricRegistry
 import io.circe.{Decoder, Encoder, HCursor, Json}
 import io.heimdallr.models._
+import io.heimdallr.statsd._
 import org.slf4j.LoggerFactory
 import io.heimdallr.util.{Startable, Stoppable}
 
@@ -25,7 +26,7 @@ case class UpdateStoreFile(path: String, state: Map[String, Seq[Service]])
 
 class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Service]],
             stateConfig: Option[StateConfig],
-            metrics: MetricRegistry)
+            statsd: Statsd)
     extends Startable[Store]
     with Stoppable[Store] {
 
@@ -35,9 +36,6 @@ class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Serv
   private implicit val http         = Http(system)
 
   private val actor = system.actorOf(FileWriter.props())
-
-  private val readCounter  = metrics.counter("store-reads")
-  private val writeCounter = metrics.counter("store-writes")
 
   lazy val logger = LoggerFactory.getLogger("heimdallr")
 
@@ -79,7 +77,7 @@ class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Serv
   }
 
   def modify(f: Map[String, Seq[Service]] => Map[String, Seq[Service]]): Map[String, Seq[Service]] = {
-    readCounter.inc()
+    statsd.increment("store-reads")
     val modifiedState = ref.updateAndGet(services => f(services))
     stateConfig.flatMap(_.local).map(_.path).foreach { path =>
       actor ! UpdateStoreFile(path, modifiedState)
@@ -88,7 +86,7 @@ class Store(initialState: Map[String, Seq[Service]] = Map.empty[String, Seq[Serv
   }
 
   def get(): Map[String, Seq[Service]] = {
-    writeCounter.inc()
+    statsd.increment("store-writes")
     ref.get()
   }
 

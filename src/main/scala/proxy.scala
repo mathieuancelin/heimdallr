@@ -19,6 +19,7 @@ import io.heimdallr.modules.Modules
 import org.slf4j.LoggerFactory
 import io.heimdallr.proxies.HttpProxy
 import io.heimdallr.store.Store
+import io.heimdallr.statsd.Statsd
 import io.heimdallr.util.{Startable, Stoppable}
 
 import scala.concurrent.Await
@@ -26,16 +27,10 @@ import scala.concurrent.duration._
 
 case class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[Proxy] with Stoppable[Proxy] {
 
-  val metrics   = new MetricRegistry()
-  val store     = new Store(config.services.groupBy(_.domain), config.state, metrics)
-  val httpProxy = new HttpProxy(config, store, modules, metrics)
-  val adminApi  = new AdminApi(config, store, metrics)
-
-  private val jmxReporter = JmxReporter
-    .forRegistry(metrics)
-    .convertRatesTo(TimeUnit.SECONDS)
-    .convertDurationsTo(TimeUnit.MILLISECONDS)
-    .build()
+  val statsd    = new Statsd(config)
+  val store     = new Store(config.services.groupBy(_.domain), config.state, statsd)
+  val httpProxy = new HttpProxy(config, store, modules, statsd)
+  val adminApi  = new AdminApi(config, store, statsd)
 
   private def setupLoggers(): Unit = {
     val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
@@ -53,21 +48,21 @@ case class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[
   override def start(): Proxy = {
     setupLoggers()
     store.start()
+    statsd.start()
     httpProxy.start()
     if (config.api.enabled) {
       adminApi.start()
     }
-    jmxReporter.start()
     this
   }
 
   override def stop(): Unit = {
     store.stop()
+    statsd.stop()
     httpProxy.stop()
     if (config.api.enabled) {
       adminApi.stop()
     }
-    jmxReporter.stop()
   }
 
   def stopOnShutdown(): Proxy = {

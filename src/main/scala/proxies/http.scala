@@ -17,13 +17,14 @@ import com.codahale.metrics.MetricRegistry
 import io.heimdallr.models.{WithApiKeyOrNot, _}
 import io.heimdallr.modules._
 import io.heimdallr.store.Store
+import io.heimdallr.statsd._
 import io.heimdallr.util._
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{Future, TimeoutException}
 import scala.util.Success
 
-class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metrics: MetricRegistry)
+class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, statsd: Statsd)
     extends Startable[HttpProxy]
     with Stoppable[HttpProxy] {
 
@@ -50,7 +51,9 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metri
 
   def findService(host: String, path: Uri.Path, headers: Map[String, HttpHeader]): Option[Service] = {
     val uri = path.toString()
-    store.get().get(host).flatMap { services =>
+
+    @inline
+    def findSubService(services: Seq[Service]): Option[Service] = {
       val sortedServices = services
         .filter(_.enabled)
         .sortWith(
@@ -86,6 +89,17 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metri
       }
       found
     }
+
+    store.get().get(host).flatMap(findSubService) match {
+      case s@Some(_) => s
+      case None => {
+        val state = store.get()
+        state.keys.find(k => RegexPool(k).matches(host)).flatMap(k => state.get(k)) match {
+          case Some(services) => findSubService(services)
+          case None => None
+        }
+      }
+    }
   }
 
   def extractCallRestriction(service: Service, path: Uri.Path): CallRestriction = {
@@ -101,7 +115,7 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, metri
 
   def handler(request: HttpRequest): Future[HttpResponse] = {
     val start     = System.currentTimeMillis()
-    val startCtx  = metrics.timer("proxy-request").time()
+    val startCtx  = statsd.timeCtx("proxy-request")
     val requestId = UUID.randomUUID().toString
     val host      = extractHost(request)
     val fu = findService(host, request.uri.path, request.headers.groupBy(_.name()).mapValues(_.last)) match {

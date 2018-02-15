@@ -17,8 +17,6 @@ libraryDependencies ++= {
     "com.typesafe.akka"      %% "akka-stream-kafka"  % "0.18",
     "org.gnieh"              %% "diffson-circe"      % "2.2.4",
     "ch.qos.logback"         % "logback-classic"     % "1.2.3",
-    "io.dropwizard.metrics"  % "metrics-core"        % "4.0.2",
-    "io.dropwizard.metrics"  % "metrics-jmx"         % "4.0.2",
     "io.circe"               %% "circe-core"         % "0.9.0",
     "io.circe"               %% "circe-generic"      % "0.9.0",
     "io.circe"               %% "circe-parser"       % "0.9.0",

@@ -10,13 +10,14 @@ import com.codahale.metrics.MetricRegistry
 import io.circe.Json
 import io.heimdallr.models._
 import io.heimdallr.store.Store
+import io.heimdallr.statsd._
 import io.heimdallr.util.HttpResponses._
 import io.heimdallr.util.{HttpsSupport, Startable, Stoppable}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.Future
 
-class AdminApi(config: ProxyConfig, store: Store, metrics: MetricRegistry)
+class AdminApi(config: ProxyConfig, store: Store, metrics: Statsd)
     extends Startable[AdminApi]
     with Stoppable[AdminApi] {
 

@@ -50,6 +50,16 @@ case class OtoroshiStateConfig(url: String, headers: Map[String, String], pollEv
 case class LocalStateConfig(path: String, writeEvery: FiniteDuration = 10.seconds)
 case class RemoteStateConfig(url: String, headers: Map[String, String], pollEvery: FiniteDuration = 10.seconds)
 
+case class StatsdConfig(datadog: Boolean, host: String, port: Int)
+case class StatsdEventClose()
+case class StatsdEvent(action: String,
+                       name: String,
+                       value: Double,
+                       strValue: String,
+                       sampleRate: Double,
+                       bypassSampler: Boolean,
+                       config: StatsdConfig)
+
 case class StateConfig(
     local: Option[LocalStateConfig] = None,
     remote: Option[RemoteStateConfig] = None,
@@ -109,7 +119,8 @@ case class ProxyConfig(
     api: ApiConfig = ApiConfig(),
     services: Seq[Service] = Seq.empty,
     state: Option[StateConfig] = None,
-    loggers: LoggersConfig = LoggersConfig("INFO")
+    loggers: LoggersConfig = LoggersConfig("INFO"),
+    statsd: Option[StatsdConfig] = None
 ) {
   def pretty: String = Encoders.ProxyConfigEncoder.apply(this).spaces2
 }
@@ -125,6 +136,7 @@ object Decoders {
   implicit val HttpProtocolDecoder: Decoder[HttpProtocol] = new Decoder[HttpProtocol] {
     override def apply(c: HCursor): Result[HttpProtocol] = c.as[String].map(v => HttpProtocol(v))
   }
+  implicit val StatsdConfigDecoder: Decoder[StatsdConfig] = deriveDecoder[StatsdConfig]
   implicit val OtoroshiStateConfigDecoder: Decoder[OtoroshiStateConfig] = deriveDecoder[OtoroshiStateConfig]
   implicit val LocalStateConfigDecoder: Decoder[LocalStateConfig]       = deriveDecoder[LocalStateConfig]
   implicit val RemoteStateConfigDecoder: Decoder[RemoteStateConfig]     = deriveDecoder[RemoteStateConfig]
@@ -150,6 +162,7 @@ object Encoders {
   implicit val HttpProtocolEncoder: Encoder[HttpProtocol] = new Encoder[HttpProtocol] {
     override def apply(a: HttpProtocol): Json = Json.fromString(a.value)
   }
+  implicit val StatsdConfigEncoder: Encoder[StatsdConfig] = deriveEncoder[StatsdConfig]
   implicit val OtoroshiStateConfigEncoder: Encoder[OtoroshiStateConfig] = deriveEncoder[OtoroshiStateConfig]
   implicit val LocalStateConfigEncoder: Encoder[LocalStateConfig]       = deriveEncoder[LocalStateConfig]
   implicit val RemoteStateConfigEncoder: Encoder[RemoteStateConfig]     = deriveEncoder[RemoteStateConfig]
