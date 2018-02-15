@@ -136,7 +136,7 @@ object Decoders {
   implicit val HttpProtocolDecoder: Decoder[HttpProtocol] = new Decoder[HttpProtocol] {
     override def apply(c: HCursor): Result[HttpProtocol] = c.as[String].map(v => HttpProtocol(v))
   }
-  implicit val StatsdConfigDecoder: Decoder[StatsdConfig] = deriveDecoder[StatsdConfig]
+  implicit val StatsdConfigDecoder: Decoder[StatsdConfig]               = deriveDecoder[StatsdConfig]
   implicit val OtoroshiStateConfigDecoder: Decoder[OtoroshiStateConfig] = deriveDecoder[OtoroshiStateConfig]
   implicit val LocalStateConfigDecoder: Decoder[LocalStateConfig]       = deriveDecoder[LocalStateConfig]
   implicit val RemoteStateConfigDecoder: Decoder[RemoteStateConfig]     = deriveDecoder[RemoteStateConfig]
@@ -162,7 +162,7 @@ object Encoders {
   implicit val HttpProtocolEncoder: Encoder[HttpProtocol] = new Encoder[HttpProtocol] {
     override def apply(a: HttpProtocol): Json = Json.fromString(a.value)
   }
-  implicit val StatsdConfigEncoder: Encoder[StatsdConfig] = deriveEncoder[StatsdConfig]
+  implicit val StatsdConfigEncoder: Encoder[StatsdConfig]               = deriveEncoder[StatsdConfig]
   implicit val OtoroshiStateConfigEncoder: Encoder[OtoroshiStateConfig] = deriveEncoder[OtoroshiStateConfig]
   implicit val LocalStateConfigEncoder: Encoder[LocalStateConfig]       = deriveEncoder[LocalStateConfig]
   implicit val RemoteStateConfigEncoder: Encoder[RemoteStateConfig]     = deriveEncoder[RemoteStateConfig]

@@ -1,6 +1,5 @@
 package io.heimdallr.statsd
 
-
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Try}
 import scala.util.control.NonFatal
@@ -21,12 +20,9 @@ case class TimeCtx(start: Long, name: String, statsd: Statsd) {
   }
 }
 
-class Statsd(config: ProxyConfig) 
-    extends Startable[Statsd]
-    with Stoppable[Statsd] {
+class Statsd(config: ProxyConfig, actorSystem: ActorSystem) extends Startable[Statsd] with Stoppable[Statsd] {
 
-  val actorSystem = ActorSystem("statsd")
-  val statsdActor = actorSystem.actorOf(StatsdActor.props())
+  lazy val statsdActor = actorSystem.actorOf(StatsdActor.props())
 
   lazy val defaultSampleRate: Double = 1.0
 
@@ -37,7 +33,7 @@ class Statsd(config: ProxyConfig)
   }
 
   override def stop(): Unit = {
-    actorSystem.terminate()
+    close()
   }
 
   def close(): Unit = {
@@ -109,7 +105,10 @@ class Statsd(config: ProxyConfig)
     TimeCtx(System.currentTimeMillis, name, this)
   }
 
-  def timer(name: String, milliseconds: Double, sampleRate: Double = defaultSampleRate, bypassSampler: Boolean = false): Unit = {
+  def timer(name: String,
+            milliseconds: Double,
+            sampleRate: Double = defaultSampleRate,
+            bypassSampler: Boolean = false): Unit = {
     optConfig.foreach(
       config => statsdActor ! StatsdEvent("timer", name, milliseconds, "", sampleRate, bypassSampler, config)
     )

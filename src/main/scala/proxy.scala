@@ -27,10 +27,11 @@ import scala.concurrent.duration._
 
 case class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[Proxy] with Stoppable[Proxy] {
 
-  val statsd    = new Statsd(config)
-  val store     = new Store(config.services.groupBy(_.domain), config.state, statsd)
-  val httpProxy = new HttpProxy(config, store, modules, statsd)
-  val adminApi  = new AdminApi(config, store, statsd)
+  val actorSystem = ActorSystem("heimdallr")
+  val statsd      = new Statsd(config, actorSystem)
+  val store       = new Store(config.services.groupBy(_.domain), config.state, statsd)
+  val httpProxy   = new HttpProxy(config, store, modules, statsd)
+  val adminApi    = new AdminApi(config, store, statsd)
 
   private def setupLoggers(): Unit = {
     val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
@@ -63,6 +64,7 @@ case class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[
     if (config.api.enabled) {
       adminApi.stop()
     }
+    actorSystem.terminate()
   }
 
   def stopOnShutdown(): Proxy = {

@@ -91,12 +91,12 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, stats
     }
 
     store.get().get(host).flatMap(findSubService) match {
-      case s@Some(_) => s
+      case s @ Some(_) => s
       case None => {
         val state = store.get()
         state.keys.find(k => RegexPool(k).matches(host)).flatMap(k => state.get(k)) match {
           case Some(services) => findSubService(services)
-          case None => None
+          case None           => None
         }
       }
     }
