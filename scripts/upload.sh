@@ -19,7 +19,7 @@ then
     docker login -u $DOCKER_USER -p $DOCKER_PASSWORD mathieuancelin-docker-heimdallr-docker.bintray.io
     docker tag heimdallr mathieuancelin-docker-heimdallr-docker.bintray.io/heimdallr
     docker push mathieuancelin-docker-heimdallr-docker.bintray.io/heimdallr
-    docker tag heimdallr-dev mathieuancelin-docker-heimdallr-docker.bintray.io/heimdallr-dev
-    docker push mathieuancelin-docker-heimdallr-docker.bintray.io/heimdallr-dev
+    #docker tag heimdallr-dev mathieuancelin-docker-heimdallr-docker.bintray.io/heimdallr-dev
+    #docker push mathieuancelin-docker-heimdallr-docker.bintray.io/heimdallr-dev
   fi
 fi

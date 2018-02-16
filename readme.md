@@ -225,12 +225,13 @@ docker run -d -p "8083:80" emilevauge/whoami
 
 ## Features
 
-- [x] write some usage docs in readme
 - [ ] built-in kafka support as commands input
 - [ ] built-in kafka support as logs output
-- [x] statsd support (include metrics in statsd actor for REST metrics)
+- [ ] implements more statsd measure points
 - [ ] dynamic TLS
 - [ ] add extra typesafe attributes to services and apikey for modules ???
+- [x] write some usage docs in readme
+- [x] statsd support
 - [x] handle wildcard matching hosts
 - [x] otoroshi config poll module
 - [x] find a name for the project
