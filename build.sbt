@@ -7,9 +7,11 @@ version := "1.0.0"
 scalaVersion := "2.12.4"
 
 libraryDependencies ++= {
-  lazy val akkaHttpVersion = "10.1.1"
-  lazy val akkaVersion     = "2.5.12"
+  lazy val akkaHttpVersion  = "10.1.1"
+  lazy val akkaVersion      = "2.5.12"
   lazy val circeVersion     = "0.9.3"
+  lazy val bcVersion        = "1.59"
+  lazy val scalaTestVersion = "3.0.4"
   Seq(
     "com.typesafe.akka"      %% "akka-http"          % akkaHttpVersion,
     "com.typesafe.akka"      %% "akka-http2-support" % akkaHttpVersion,
@@ -25,11 +27,12 @@ libraryDependencies ++= {
     "org.mortbay.jetty.alpn" % "jetty-alpn-agent"    % "2.0.7",
     "com.auth0"              % "java-jwt"            % "3.3.0",
     "com.github.gphat"       %% "censorinus"         % "2.1.13",
-    "org.bouncycastle"       % "bcprov-jdk15on"      % "1.59",
-    "org.bouncycastle"       % "bcpkix-jdk15on"      % "1.59",
-    "org.bouncycastle"       % "bctls-jdk15on"       % "1.59",
+    "org.bouncycastle"       % "bcprov-jdk15on"      % bcVersion,
+    "org.bouncycastle"       % "bcpkix-jdk15on"      % bcVersion,
+    "org.bouncycastle"       % "bctls-jdk15on"       % bcVersion,
     "com.google.guava"       % "guava"               % "23.0",
-    "commons-io"             % "commons-io"          % "2.6"
+    "commons-io"             % "commons-io"          % "2.6",
+    "org.scalatest"         %% "scalatest"           % scalaTestVersion % Test
   )
 }
 

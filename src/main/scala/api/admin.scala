@@ -2,6 +2,7 @@ package io.heimdallr.api
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.util.FastFuture
 import akka.stream.ActorMaterializer
@@ -14,7 +15,8 @@ import io.heimdallr.util.HttpResponses._
 import io.heimdallr.util.{HttpsSupport, Startable, Stoppable}
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
+import scala.util.{Failure, Success}
 
 class AdminApi(config: ProxyConfig, store: Store, metrics: Statsd)
     extends Startable[AdminApi]
@@ -24,6 +26,9 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: Statsd)
   implicit val executor     = system.dispatcher
   implicit val materializer = ActorMaterializer()
   implicit val http         = Http(system)
+
+  val boundHttp = Promise[ServerBinding]
+  val boundHttps = Promise[ServerBinding]
 
   lazy val logger = LoggerFactory.getLogger("heimdallr")
 
@@ -58,12 +63,18 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: Statsd)
 
   def start(): Stoppable[AdminApi] = {
     logger.info(s"Listening for api commands on http://${config.api.listenOn}:${config.api.httpPort}")
-    http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpPort)
+    http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpPort).andThen {
+      case Success(sb) => boundHttp.trySuccess(sb)
+      case Failure(e) => boundHttp.tryFailure(e)
+    }
     config.api.certPath.foreach { path =>
       val httpsContext =
         HttpsSupport.context(path, config.api.keyPath, config.api.certPass.get, config.api.keyStoreType)
       logger.info(s"Listening for api commands on https://${config.api.listenOn}:${config.api.httpsPort}")
-      http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpsPort, connectionContext = httpsContext)
+      http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpsPort, connectionContext = httpsContext).andThen {
+        case Success(sb) => boundHttp.trySuccess(sb)
+        case Failure(e) => boundHttp.tryFailure(e)
+      }
     }
     this
   }

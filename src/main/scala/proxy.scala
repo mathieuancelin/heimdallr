@@ -55,6 +55,20 @@ case class Proxy(config: ProxyConfig, modules: ModulesConfig) extends Startable[
     this
   }
 
+  def startAndWait(): Proxy = {
+    import scala.concurrent.duration._
+    setupLoggers()
+    store.start()
+    statsd.start()
+    httpProxy.start()
+    Await.result(httpProxy.boundHttp.future, 60.seconds)
+    if (config.api.enabled) {
+      adminApi.start()
+      Await.result(adminApi.boundHttp.future, 60.seconds)
+    }
+    this
+  }
+
   override def stop(): Unit = {
     store.stop()
     statsd.stop()

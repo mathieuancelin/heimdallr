@@ -1,11 +1,12 @@
 package io.heimdallr.proxies
 
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.{Base64, UUID}
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.Uri.Authority
 import akka.http.scaladsl.model.headers.Host
 import akka.http.scaladsl.model.ws.UpgradeToWebSocket
@@ -15,13 +16,13 @@ import akka.pattern.CircuitBreaker
 import akka.stream.ActorMaterializer
 import io.heimdallr.models.{WithApiKeyOrNot, _}
 import io.heimdallr.modules._
-import io.heimdallr.store.Store
 import io.heimdallr.statsd._
+import io.heimdallr.store.Store
 import io.heimdallr.util._
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.{Future, TimeoutException}
-import scala.util.Success
+import scala.concurrent.{Future, Promise, TimeoutException}
+import scala.util.{Failure, Success}
 
 class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, statsd: Statsd)
     extends Startable[HttpProxy]
@@ -33,6 +34,9 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, stats
   implicit val http         = Http(system)
 
   lazy val logger = LoggerFactory.getLogger("heimdallr")
+
+  val boundHttp = Promise[ServerBinding]
+  val boundHttps = Promise[ServerBinding]
 
   val AbsoluteUri = """(?is)^(https?)://([^/]+)(/.*|$)""".r
 
@@ -278,12 +282,18 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, stats
 
   def start(): Stoppable[HttpProxy] = {
     logger.info(s"Listening for http call on http://${config.http.listenOn}:${config.http.httpPort}")
-    http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpPort)
+    http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpPort).andThen {
+      case Success(sb) => boundHttp.trySuccess(sb)
+      case Failure(e) => boundHttp.tryFailure(e)
+    }
     config.http.certPath.foreach { path =>
       val httpsContext =
         HttpsSupport.context(path, config.http.keyPath, config.http.certPass.get, config.http.keyStoreType)
       logger.info(s"Listening for https calls on https://${config.http.listenOn}:${config.http.httpsPort}")
-      http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpsPort, connectionContext = httpsContext)
+      http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpsPort, connectionContext = httpsContext).andThen {
+        case Success(sb) => boundHttps.trySuccess(sb)
+        case Failure(e) => boundHttps.tryFailure(e)
+      }
     }
     this
   }

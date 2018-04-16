@@ -9,17 +9,7 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.regex.Pattern
 import javax.net.ssl._
 
-import akka.actor.{
-  Actor,
-  ActorRef,
-  ActorRefFactory,
-  OneForOneStrategy,
-  PoisonPill,
-  Props,
-  Status,
-  SupervisorStrategy,
-  Terminated
-}
+import akka.actor.{Actor, ActorRef, ActorRefFactory, ActorSystem, OneForOneStrategy, PoisonPill, Props, Status, SupervisorStrategy, Terminated}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.{ConnectionContext, HttpsConnectionContext}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
@@ -28,6 +18,7 @@ import io.circe.Json
 import org.slf4j.LoggerFactory
 import ssl.PemReader
 
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Random, Success}
 
@@ -413,4 +404,15 @@ object IdGenerator {
   def token: String                    = token(64)
   def extendedToken(size: Int): String = token(EXTENDED_CHARACTERS, size)
   def extendedToken: String            = token(EXTENDED_CHARACTERS, 64)
+}
+
+object Timeout {
+  def apply[A](timeout: FiniteDuration)(implicit system: ActorSystem): Future[Unit] = {
+    implicit val executionContext = system.dispatcher
+    val prom = Promise[Unit]
+    system.scheduler.scheduleOnce(timeout) {
+      prom.trySuccess(())
+    }
+    prom.future
+  }
 }
