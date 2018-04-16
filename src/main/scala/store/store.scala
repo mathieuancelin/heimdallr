@@ -11,7 +11,6 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.util.FastFuture
 import akka.stream._
 import akka.util.ByteString
-import com.codahale.metrics.MetricRegistry
 import io.circe.{Decoder, Encoder, HCursor, Json}
 import io.heimdallr.models._
 import io.heimdallr.statsd._

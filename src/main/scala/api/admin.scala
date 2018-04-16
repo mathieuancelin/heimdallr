@@ -6,7 +6,6 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.util.FastFuture
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
-import com.codahale.metrics.MetricRegistry
 import io.circe.Json
 import io.heimdallr.models._
 import io.heimdallr.store.Store

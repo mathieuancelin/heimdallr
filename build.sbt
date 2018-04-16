@@ -7,23 +7,24 @@ version := "1.0.0"
 scalaVersion := "2.12.4"
 
 libraryDependencies ++= {
-  lazy val akkaHttpVersion = "10.1.0-RC2"
-  lazy val akkaVersion     = "2.5.9"
+  lazy val akkaHttpVersion = "10.1.1"
+  lazy val akkaVersion     = "2.5.12"
+  lazy val circeVersion     = "0.9.3"
   Seq(
     "com.typesafe.akka"      %% "akka-http"          % akkaHttpVersion,
     "com.typesafe.akka"      %% "akka-http2-support" % akkaHttpVersion,
     "com.typesafe.akka"      %% "akka-stream"        % akkaVersion,
     "com.typesafe.akka"      %% "akka-actor"         % akkaVersion,
-    "com.typesafe.akka"      %% "akka-stream-kafka"  % "0.18",
-    "org.gnieh"              %% "diffson-circe"      % "2.2.4",
+    "com.typesafe.akka"      %% "akka-stream-kafka"  % "0.20",
+    "org.gnieh"              %% "diffson-circe"      % "2.2.6",
     "ch.qos.logback"         % "logback-classic"     % "1.2.3",
-    "io.circe"               %% "circe-core"         % "0.9.0",
-    "io.circe"               %% "circe-generic"      % "0.9.0",
-    "io.circe"               %% "circe-parser"       % "0.9.0",
-    "io.circe"               %% "circe-optics"       % "0.9.0",
-    "org.mortbay.jetty.alpn" % "jetty-alpn-agent"    % "2.0.6",
+    "io.circe"               %% "circe-core"         % circeVersion,
+    "io.circe"               %% "circe-generic"      % circeVersion,
+    "io.circe"               %% "circe-parser"       % circeVersion,
+    "io.circe"               %% "circe-optics"       % circeVersion,
+    "org.mortbay.jetty.alpn" % "jetty-alpn-agent"    % "2.0.7",
     "com.auth0"              % "java-jwt"            % "3.3.0",
-    "com.github.gphat"       %% "censorinus"         % "2.1.8",
+    "com.github.gphat"       %% "censorinus"         % "2.1.13",
     "org.bouncycastle"       % "bcprov-jdk15on"      % "1.59",
     "org.bouncycastle"       % "bcpkix-jdk15on"      % "1.59",
     "org.bouncycastle"       % "bctls-jdk15on"       % "1.59",

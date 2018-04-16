@@ -11,8 +11,6 @@ import akka.util.ByteString
 import io.heimdallr.api.AdminApi
 import ch.qos.logback.classic.{Level, LoggerContext}
 import ch.qos.logback.classic.joran.JoranConfigurator
-import com.codahale.metrics.MetricRegistry
-import com.codahale.metrics.jmx.JmxReporter
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigRenderOptions, ConfigResolveOptions}
 import io.heimdallr.models._
 import io.heimdallr.modules.Modules

@@ -13,7 +13,6 @@ import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.util.FastFuture
 import akka.pattern.CircuitBreaker
 import akka.stream.ActorMaterializer
-import com.codahale.metrics.MetricRegistry
 import io.heimdallr.models.{WithApiKeyOrNot, _}
 import io.heimdallr.modules._
 import io.heimdallr.store.Store
