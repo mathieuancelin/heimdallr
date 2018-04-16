@@ -33,7 +33,7 @@ trait HeimdallrTestCaseHelper {
       val port = serverSocket.getLocalPort
       serverSocket.close()
       port
-    }.toOption.getOrElse(Random.nextInt (1000) + 7000)
+    }.toOption.getOrElse(Random.nextInt(1000) + 7000)
   }
 
   val AbsoluteUri = """(?is)^(https?)://([^/]+)(/.*|$)""".r
@@ -69,8 +69,6 @@ trait HeimdallrTestCaseHelper {
     implicit val mat    = ActorMaterializer.create(system)
     implicit val http   = Http(system)
 
-    println(s"TargetService on $port")
-
     def handler(request: HttpRequest): Future[HttpResponse] = {
       (request.method, request.uri.path) match {
         case (HttpMethods.GET, p) if p.toString() == path  && extractHost(request) == host => {
@@ -86,7 +84,7 @@ trait HeimdallrTestCaseHelper {
     val bound = http.bindAndHandleAsync(handler, "0.0.0.0", port)
 
     def await(): TargetService = {
-      Await.result(bound, 10.seconds)
+      Await.result(bound, 60.seconds)
       this
     }
   }

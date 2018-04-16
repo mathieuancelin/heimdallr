@@ -25,7 +25,7 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
 
       val httpPort = freePort
 
-      val heimdallr = HeimdallrInstance(freePort, Seq(
+      val heimdallr = HeimdallrInstance(httpPort, Seq(
         Service(
           id = "simple-test",
           domain = "simple.foo.bar",
@@ -72,7 +72,7 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
 
       val httpPort = freePort
 
-      val heimdallr = HeimdallrInstance(freePort, Seq(
+      val heimdallr = HeimdallrInstance(httpPort, Seq(
         Service(
           id = "simple-test-1",
           domain = "simple.foo.bar",
@@ -85,13 +85,21 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
         )
       ))
 
-      Timeout(20.seconds).await()
+      Timeout(2.seconds).await()
 
-      val (status, body) = HttpCall(targetServer1.http, httpPort, "simple.foo.bar", "/api").await()
+      val (status1, body1) = HttpCall(targetServer1.http, httpPort, "simple.foo.bar", "/api").await()
+      val (status2, body2) = HttpCall(targetServer1.http, httpPort, "simple.foo.bar", "/api").await()
+      val (status3, body3) = HttpCall(targetServer1.http, httpPort, "simple.foo.bar", "/api").await()
 
-      status mustEqual 200
-      body mustEqual expectedBody
+      status1 mustEqual 200
+      body1 mustEqual expectedBody
 
+      status2 mustEqual 200
+      body2 mustEqual expectedBody
+
+      status3 mustEqual 200
+      body3 mustEqual expectedBody
+      
       targetCounter1.get() mustEqual 1
       targetCounter2.get() mustEqual 1
       targetCounter3.get() mustEqual 1
