@@ -99,7 +99,7 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
 
       status3 mustEqual 200
       body3 mustEqual expectedBody
-      
+
       targetCounter1.get() mustEqual 1
       targetCounter2.get() mustEqual 1
       targetCounter3.get() mustEqual 1

@@ -4,7 +4,7 @@ LOCATION=`pwd`
 cd $LOCATION
 
 build_server () { 
-  sbt ';clean;compile;dist;assembly'
+  sbt ';clean;compile;test;dist;assembly'
 }
 
 build_docker () {
