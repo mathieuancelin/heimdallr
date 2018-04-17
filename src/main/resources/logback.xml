@@ -23,6 +23,7 @@
 
     <logger name="heimdallr" level="INFO" />
     <logger name="heimdallr-ws" level="INFO" />
+    <logger name="heimdallr-test" level="INFO" />
 
     <root level="INFO">
         <!--appender-ref ref="ASYNCFILE" /-->

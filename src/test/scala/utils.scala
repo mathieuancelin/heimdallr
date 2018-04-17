@@ -16,6 +16,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Random, Try}
 import io.heimdallr.util.Implicits._
+import org.slf4j.LoggerFactory
 
 object FutureImplicits {
   implicit class BetterFuture[A](val fu: Future[A]) extends AnyVal {
@@ -40,15 +41,15 @@ trait HeimdallrTestCaseHelper {
 
   def extractHost(request: HttpRequest): String = request.getHeader("X-Fowarded-Host").asOption.map(_.value()).getOrElse("--")
 
-  def HttpCall(http: HttpExt, port: Int, host: String, path: String)(implicit executionContext: ExecutionContext, mat: ActorMaterializer): Future[(Int, String)] = {
+  def HttpCall(http: HttpExt, port: Int, host: String, path: String, headers: Seq[HttpHeader] = Seq.empty)(implicit executionContext: ExecutionContext, mat: ActorMaterializer): Future[(Int, String, Seq[HttpHeader])] = {
     http.singleRequest(HttpRequest(
       method = HttpMethods.GET,
       protocol = HttpProtocols.`HTTP/1.1`,
-      headers = List(Host(host)),
+      headers = List(Host(host)) ++ headers,
       uri = Uri(s"http://127.0.0.1:$port$path")
     )).flatMap { response =>
       response.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { body =>
-        (response.status.intValue(), body.utf8String)
+        (response.status.intValue(), body.utf8String, response.headers)
       }
     }
   }
@@ -60,7 +61,7 @@ trait HeimdallrTestCaseHelper {
       services = services)).startAndWait()
   }
 
-  class TargetService(host: String, path: String, contentType: String, result: HttpRequest => String) {
+  class TargetService(host: Option[String], path: String, contentType: String, result: HttpRequest => String) {
 
     val port = freePort
 
@@ -69,15 +70,25 @@ trait HeimdallrTestCaseHelper {
     implicit val mat    = ActorMaterializer.create(system)
     implicit val http   = Http(system)
 
+    val logger = LoggerFactory.getLogger("heimdallr-test")
+
     def handler(request: HttpRequest): Future[HttpResponse] = {
       (request.method, request.uri.path) match {
-        case (HttpMethods.GET, p) if p.toString() == path  && extractHost(request) == host => {
+        case (HttpMethods.GET, p) if p.toString() == path  && host.isEmpty => {
           FastFuture.successful(HttpResponse(
             200,
             entity = HttpEntity(ContentType.parse(contentType).getOrElse(ContentTypes.`application/json`), ByteString(result(request)))
           ))
         }
-        case (_, p) => FastFuture.successful(HttpResponses.NotFound(p.toString()))
+        case (HttpMethods.GET, p) if p.toString() == path  && extractHost(request) == host.get => {
+          FastFuture.successful(HttpResponse(
+            200,
+            entity = HttpEntity(ContentType.parse(contentType).getOrElse(ContentTypes.`application/json`), ByteString(result(request)))
+          ))
+        }
+        case (_, p) => {
+          FastFuture.successful(HttpResponses.NotFound(p.toString()))
+        }
       }
     }
 
@@ -90,7 +101,7 @@ trait HeimdallrTestCaseHelper {
   }
 
   object TargetService {
-    def apply(host: String, path: String, contentType: String, result: HttpRequest => String): TargetService = {
+    def apply(host: Option[String], path: String, contentType: String, result: HttpRequest => String): TargetService = {
       new TargetService(host, path, contentType, result)
     }
   }
