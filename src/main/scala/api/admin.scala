@@ -9,6 +9,7 @@ import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import io.circe.Json
 import io.heimdallr.models._
+import io.heimdallr.modules.Extensions
 import io.heimdallr.store.Store
 import io.heimdallr.statsd._
 import io.heimdallr.util.HttpResponses._
@@ -18,13 +19,13 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class AdminApi[A](config: ProxyConfig[A],
-                  store: Store[A],
-                  metrics: Statsd[A],
-                  commands: Commands[A],
-                  encoders: Encoders[A])
-    extends Startable[AdminApi[A]]
-    with Stoppable[AdminApi[A]] {
+class AdminApi[A, K](config: ProxyConfig[A, K],
+                  store: Store[A, K],
+                  metrics: Statsd[A, K],
+                  commands: Commands[A, K],
+                     encoders: Encoders[A, K])
+    extends Startable[AdminApi[A, K]]
+    with Stoppable[AdminApi[A, K]] {
 
   implicit val system       = ActorSystem()
   implicit val executor     = system.dispatcher
@@ -65,7 +66,7 @@ class AdminApi[A](config: ProxyConfig[A],
     }
   }
 
-  def start(): Stoppable[AdminApi[A]] = {
+  def start(): Stoppable[AdminApi[A, K]] = {
     logger.info(s"Listening for api commands on http://${config.api.listenOn}:${config.api.httpPort}")
     http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpPort).andThen {
       case Success(sb) => boundHttp.trySuccess(sb)

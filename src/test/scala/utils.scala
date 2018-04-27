@@ -63,13 +63,12 @@ trait HeimdallrTestCaseHelper {
       }
   }
 
-  def HeimdallrInstance(httpPort: Int, services: Seq[Service[NoExtension]]): io.heimdallr.Proxy[NoExtension] = {
+  def HeimdallrInstance(httpPort: Int, services: Seq[Service[NoExtension, NoExtension]]): io.heimdallr.Proxy[NoExtension, NoExtension] = {
     io.heimdallr.Proxy
       .withConfig(
         ProxyConfig(api = ApiConfig(enabled = false), http = HttpConfig(httpPort = httpPort), services = services),
         Modules.defaultModules,
-        NoExtension.NoExtensionEncoder,
-        NoExtension.NoExtensionDecoder
+        NoExtension
       )
       .startAndWait()
   }

@@ -24,9 +24,9 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.{Future, Promise, TimeoutException}
 import scala.util.{Failure, Success}
 
-class HttpProxy[A](config: ProxyConfig[A], store: Store[A], modules: ModulesConfig[A], statsd: Statsd[A])
-    extends Startable[HttpProxy[A]]
-    with Stoppable[HttpProxy[A]] {
+class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: ModulesConfig[A, K], statsd: Statsd[A, K])
+    extends Startable[HttpProxy[A, K]]
+    with Stoppable[HttpProxy[A, K]] {
 
   implicit val system       = ActorSystem()
   implicit val executor     = system.dispatcher
@@ -52,11 +52,11 @@ class HttpProxy[A](config: ProxyConfig[A], store: Store[A], modules: ModulesConf
     case _                                                     => request.header[Host].map(_.host.address()).getOrElse("--")
   }
 
-  def findService(host: String, path: Uri.Path, headers: Map[String, HttpHeader]): Option[Service[A]] = {
+  def findService(host: String, path: Uri.Path, headers: Map[String, HttpHeader]): Option[Service[A, K]] = {
     val uri = path.toString()
 
     @inline
-    def findSubService(services: Seq[Service[A]]): Option[Service[A]] = {
+    def findSubService(services: Seq[Service[A, K]]): Option[Service[A, K]] = {
       val sortedServices = services
         .filter(_.enabled)
         .sortWith(
@@ -65,7 +65,7 @@ class HttpProxy[A](config: ProxyConfig[A], store: Store[A], modules: ModulesConf
             else if (a.root.isEmpty && a.matchingHeaders.nonEmpty) true
             else a.root.isDefined
         )
-      var found: Option[Service[A]] = None
+      var found: Option[Service[A, K]] = None
       var index                     = 0
       while (found.isEmpty && index < sortedServices.size) {
         val s = sortedServices(index)
@@ -105,7 +105,7 @@ class HttpProxy[A](config: ProxyConfig[A], store: Store[A], modules: ModulesConf
     }
   }
 
-  def extractCallRestriction(service: Service[A], path: Uri.Path): CallRestriction = {
+  def extractCallRestriction(service: Service[A, K], path: Uri.Path): CallRestriction = {
     val uri                 = path.toString()
     val privatePatternMatch = service.privatePatterns.exists(p => RegexPool(p).matches(uri))
     val publicPatternMatch  = service.publicPatterns.exists(p => RegexPool(p).matches(uri))
@@ -280,7 +280,7 @@ class HttpProxy[A](config: ProxyConfig[A], store: Store[A], modules: ModulesConf
     fu.andThen { case _ => startCtx.close() }
   }
 
-  def start(): Stoppable[HttpProxy[A]] = {
+  def start(): Stoppable[HttpProxy[A, K]] = {
     logger.info(s"Listening for http call on http://${config.http.listenOn}:${config.http.httpPort}")
     http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpPort).andThen {
       case Success(sb) => boundHttp.trySuccess(sb)

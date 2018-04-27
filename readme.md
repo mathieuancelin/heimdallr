@@ -229,7 +229,7 @@ docker run -d -p "8083:80" emilevauge/whoami
 - [ ] built-in kafka support as logs output
 - [ ] implements more statsd measure points
 - [ ] dynamic TLS
-- [ ] add extra typesafe attributes to services and apikey for modules ???
+- [x] add extra typesafe attributes to services and apikey for modules ???
 - [x] write some usage docs in readme
 - [x] statsd support
 - [x] handle wildcard matching hosts

@@ -14,15 +14,15 @@ import io.heimdallr.util._
 
 import github.gphat.censorinus._
 
-case class TimeCtx[A](start: Long, name: String, statsd: Statsd[A]) {
+case class TimeCtx[A, K](start: Long, name: String, statsd: Statsd[A, K]) {
   def close(): Unit = {
     statsd.timer(name, System.currentTimeMillis - start)
   }
 }
 
-class Statsd[A](config: ProxyConfig[A], actorSystem: ActorSystem)
-    extends Startable[Statsd[A]]
-    with Stoppable[Statsd[A]] {
+class Statsd[A, K](config: ProxyConfig[A, K], actorSystem: ActorSystem)
+    extends Startable[Statsd[A, K]]
+    with Stoppable[Statsd[A, K]] {
 
   lazy val statsdActor = actorSystem.actorOf(StatsdActor.props())
 
@@ -30,7 +30,7 @@ class Statsd[A](config: ProxyConfig[A], actorSystem: ActorSystem)
 
   val optConfig = config.statsd
 
-  override def start(): Statsd[A] = {
+  override def start(): Statsd[A, K] = {
     this
   }
 
@@ -103,7 +103,7 @@ class Statsd[A](config: ProxyConfig[A], actorSystem: ActorSystem)
     if (optConfig.isEmpty) close()
   }
 
-  def timeCtx(name: String): TimeCtx[A] = {
+  def timeCtx(name: String): TimeCtx[A, K] = {
     TimeCtx(System.currentTimeMillis, name, this)
   }
 

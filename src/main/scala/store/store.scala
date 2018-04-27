@@ -21,21 +21,21 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.Failure
 
-case class UpdateStoreFile[A](path: String, state: Map[String, Seq[Service[A]]])
+case class UpdateStoreFile[A, K](path: String, state: Map[String, Seq[Service[A, K]]])
 
-trait Store[A] extends Startable[Store[A]] with Stoppable[Store[A]] {
-  def modify(f: Map[String, Seq[Service[A]]] => Map[String, Seq[Service[A]]]): Map[String, Seq[Service[A]]]
-  def get(): Map[String, Seq[Service[A]]]
+trait Store[A, K] extends Startable[Store[A, K]] with Stoppable[Store[A, K]] {
+  def modify(f: Map[String, Seq[Service[A, K]]] => Map[String, Seq[Service[A, K]]]): Map[String, Seq[Service[A, K]]]
+  def get(): Map[String, Seq[Service[A, K]]]
 }
 
-class AtomicStore[A](initialState: Map[String, Seq[Service[A]]] = Map.empty[String, Seq[Service[A]]],
+class AtomicStore[A, K](initialState: Map[String, Seq[Service[A, K]]] = Map.empty[String, Seq[Service[A, K]]],
                      stateConfig: Option[StateConfig],
-                     statsd: Statsd[A],
-                     encoders: Encoders[A],
-                     decoders: Decoders[A])
-    extends Store[A]
-    with Startable[Store[A]]
-    with Stoppable[Store[A]] {
+                     statsd: Statsd[A, K],
+                     encoders: Encoders[A, K],
+                     decoders: Decoders[A, K])
+    extends Store[A, K]
+    with Startable[Store[A, K]]
+    with Stoppable[Store[A, K]] {
 
   private implicit val system       = ActorSystem()
   private implicit val executor     = system.dispatcher
@@ -46,15 +46,15 @@ class AtomicStore[A](initialState: Map[String, Seq[Service[A]]] = Map.empty[Stri
 
   lazy val logger = LoggerFactory.getLogger("heimdallr")
 
-  private val ref: AtomicReference[Map[String, Seq[Service[A]]]] = {
+  private val ref: AtomicReference[Map[String, Seq[Service[A, K]]]] = {
     if (stateConfig.isDefined) {
       if (stateConfig.get.isRemote) {
-        new AtomicReference[Map[String, Seq[Service[A]]]](initialState)
+        new AtomicReference[Map[String, Seq[Service[A, K]]]](initialState)
       } else if (stateConfig.get.isOtoroshi) {
-        new AtomicReference[Map[String, Seq[Service[A]]]](initialState)
+        new AtomicReference[Map[String, Seq[Service[A, K]]]](initialState)
       } else {
         val config = stateConfig.get.local
-        new AtomicReference[Map[String, Seq[Service[A]]]](
+        new AtomicReference[Map[String, Seq[Service[A, K]]]](
           config
             .map(c => new File(c.path))
             .filter(_.exists())
@@ -64,7 +64,7 @@ class AtomicStore[A](initialState: Map[String, Seq[Service[A]]] = Map.empty[Stri
                   logger.error(s"Error while parsing state file: ${e.message}")
                   initialState
                 case Right(json) =>
-                  json.as[Seq[Service[A]]](Decoder.decodeSeq(decoders.ServiceDecoder)) match {
+                  json.as[Seq[Service[A, K]]](Decoder.decodeSeq(decoders.ServiceDecoder)) match {
                     case Left(e) =>
                       logger.error(s"Error while parsing state file: ${e.message}")
                       initialState
@@ -79,11 +79,11 @@ class AtomicStore[A](initialState: Map[String, Seq[Service[A]]] = Map.empty[Stri
         )
       }
     } else {
-      new AtomicReference[Map[String, Seq[Service[A]]]](initialState)
+      new AtomicReference[Map[String, Seq[Service[A, K]]]](initialState)
     }
   }
 
-  def modify(f: Map[String, Seq[Service[A]]] => Map[String, Seq[Service[A]]]): Map[String, Seq[Service[A]]] = {
+  def modify(f: Map[String, Seq[Service[A, K]]] => Map[String, Seq[Service[A, K]]]): Map[String, Seq[Service[A, K]]] = {
     statsd.increment("store-reads")
     val modifiedState = ref.updateAndGet(services => f(services))
     stateConfig.flatMap(_.local).map(_.path).foreach { path =>
@@ -92,12 +92,12 @@ class AtomicStore[A](initialState: Map[String, Seq[Service[A]]] = Map.empty[Stri
     modifiedState
   }
 
-  def get(): Map[String, Seq[Service[A]]] = {
+  def get(): Map[String, Seq[Service[A, K]]] = {
     statsd.increment("store-writes")
     ref.get()
   }
 
-  override def start(): Stoppable[Store[A]] = {
+  override def start(): Stoppable[Store[A, K]] = {
     stateConfig.flatMap(_.local).foreach { config =>
       system.scheduler.schedule(0.seconds, config.writeEvery) {
         actor ! UpdateStoreFile(config.path, get())
@@ -105,14 +105,14 @@ class AtomicStore[A](initialState: Map[String, Seq[Service[A]]] = Map.empty[Stri
     }
     stateConfig.flatMap(_.remote).foreach { config =>
       system.scheduler.schedule(0.seconds, config.pollEvery) {
-        RemoteStateFetch.fetchRemoteState[A](config, http, decoders).map(s => modify(_ => s)).andThen {
+        RemoteStateFetch.fetchRemoteState[A, K](config, http, decoders).map(s => modify(_ => s)).andThen {
           case Failure(e) => logger.error(s"Error while fetching remote state", e)
         }
       }
     }
     stateConfig.flatMap(_.otoroshi).foreach { config =>
       system.scheduler.schedule(0.seconds, config.pollEvery) {
-        OtoroshiStateFetch.fetchOtoroshiState[A](config, http).map(s => modify(_ => s)).andThen {
+        OtoroshiStateFetch.fetchOtoroshiState[A, K](config, http).map(s => modify(_ => s)).andThen {
           case Failure(e) => logger.error(s"Error while fetching otoroshi state", e)
         }
       }
@@ -125,12 +125,12 @@ class AtomicStore[A](initialState: Map[String, Seq[Service[A]]] = Map.empty[Stri
   }
 }
 
-class FileWriter[A](encoders: Encoders[A]) extends Actor {
+class FileWriter[A, K](encoders: Encoders[A, K]) extends Actor {
 
   import io.circe.syntax._
 
   override def receive: Receive = {
-    case e: UpdateStoreFile[A] => {
+    case e: UpdateStoreFile[A, K] => {
       val content = e.state.values.flatten.toSeq.asJson(Encoder.encodeSeq(encoders.ServiceEncoder)).noSpaces
       Files.write(Paths.get(e.path), content.getBytes)
     }
@@ -138,18 +138,18 @@ class FileWriter[A](encoders: Encoders[A]) extends Actor {
 }
 
 object FileWriter {
-  def props[A](encoders: Encoders[A]): Props = Props(new FileWriter(encoders))
+  def props[A, K](encoders: Encoders[A, K]): Props = Props(new FileWriter(encoders))
 }
 
 object RemoteStateFetch {
 
   lazy val logger = LoggerFactory.getLogger("heimdallr")
 
-  def fetchRemoteState[A](
+  def fetchRemoteState[A, K](
       config: RemoteStateConfig,
       http: HttpExt,
-      decoders: Decoders[A]
-  )(implicit ec: ExecutionContext, mat: Materializer): Future[Map[String, Seq[Service[A]]]] = {
+      decoders: Decoders[A, K]
+  )(implicit ec: ExecutionContext, mat: Materializer): Future[Map[String, Seq[Service[A, K]]]] = {
     val headers: List[HttpHeader] = config.headers.toList.map(t => RawHeader(t._1, t._2))
     http
       .singleRequest(
@@ -169,7 +169,7 @@ object RemoteStateFetch {
             logger.error(s"Error while parsing json from http body: ${e.message}")
             FastFuture.failed(e)
           case Right(json) =>
-            json.as[Seq[Service[A]]](Decoder.decodeSeq(decoders.ServiceDecoder)) match {
+            json.as[Seq[Service[A, K]]](Decoder.decodeSeq(decoders.ServiceDecoder)) match {
               case Left(e) =>
                 logger.error(s"Error while parsing state from http body: ${e.message}")
                 FastFuture.failed(e)
@@ -185,10 +185,10 @@ object OtoroshiStateFetch {
 
   lazy val logger = LoggerFactory.getLogger("heimdallr")
 
-  def fetchOtoroshiApiKeys(
+  def fetchOtoroshiApiKeys[K](
       config: OtoroshiStateConfig,
       http: HttpExt
-  )(implicit ec: ExecutionContext, mat: Materializer): Future[Map[String, Seq[ApiKey]]] = {
+  )(implicit ec: ExecutionContext, mat: Materializer): Future[Map[String, Seq[ApiKey[K]]]] = {
     val headers: List[HttpHeader] = config.headers.toList.map(t => RawHeader(t._1, t._2))
     http
       .singleRequest(
@@ -213,7 +213,7 @@ object OtoroshiStateFetch {
                 logger.error(s"Error while parsing json array from http body: ${e.message}")
                 FastFuture.failed(e)
               case Right(arr) => {
-                val seq: Seq[Decoder.Result[(String, ApiKey)]] = arr.map(_.hcursor).map { c =>
+                val seq: Seq[Decoder.Result[(String, ApiKey[K])]] = arr.map(_.hcursor).map { c =>
                   for {
                     clientId        <- c.downField("clientId").as[String]
                     clientSecret    <- c.downField("clientSecret").as[String]
@@ -223,12 +223,13 @@ object OtoroshiStateFetch {
                     metadata        <- c.downField("metadata").as[Map[String, String]]
                   } yield {
                     (authorizedGroup,
-                     ApiKey(
+                     ApiKey[K](
                        clientId = clientId,
                        clientSecret = clientSecret,
                        name = clientName,
                        enabled = enabled,
                        metadata = metadata,
+                       extension = None
                      ))
                   }
                 }
@@ -246,10 +247,10 @@ object OtoroshiStateFetch {
       }
   }
 
-  def fetchOtoroshiState[A](
+  def fetchOtoroshiState[A, K](
       config: OtoroshiStateConfig,
       http: HttpExt
-  )(implicit ec: ExecutionContext, mat: Materializer): Future[Map[String, Seq[Service[A]]]] = {
+  )(implicit ec: ExecutionContext, mat: Materializer): Future[Map[String, Seq[Service[A, K]]]] = {
     val headers: List[HttpHeader] = config.headers.toList.map(t => RawHeader(t._1, t._2))
     http
       .singleRequest(
@@ -263,7 +264,7 @@ object OtoroshiStateFetch {
         response.entity.dataBytes.runFold(ByteString.empty)(_ ++ _)
       }
       .flatMap { bs =>
-        fetchOtoroshiApiKeys(config, http).map { keys =>
+        fetchOtoroshiApiKeys[K](config, http).map { keys =>
           (bs, keys)
         }
       }
@@ -280,7 +281,7 @@ object OtoroshiStateFetch {
                 logger.error(s"Error while parsing json array from http body: ${e.message}")
                 FastFuture.failed(e)
               case Right(arr) => {
-                val seq: Seq[Decoder.Result[Service[A]]] = arr.map(_.hcursor).map { c =>
+                val seq: Seq[Decoder.Result[Service[A, K]]] = arr.map(_.hcursor).map { c =>
                   for {
                     id                <- c.downField("id").as[String]
                     _subdomain        <- c.downField("subdomain").as[String]
@@ -321,12 +322,12 @@ object OtoroshiStateFetch {
                     if (_subdomain.nonEmpty) {
                       domain = _subdomain + "." + domain
                     }
-                    Service[A](
+                    Service[A, K](
                       id = id,
                       domain = domain,
                       enabled = enabled,
                       targets = targets,
-                      apiKeys = keys.get(groupId).getOrElse(Seq.empty),
+                      apiKeys = keys.getOrElse(groupId, Seq.empty),
                       clientConfig = ClientConfig(
                         retry = retry,
                         maxFailures = maxFailures,
