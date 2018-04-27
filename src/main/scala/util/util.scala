@@ -9,7 +9,18 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.regex.Pattern
 import javax.net.ssl._
 
-import akka.actor.{Actor, ActorRef, ActorRefFactory, ActorSystem, OneForOneStrategy, PoisonPill, Props, Status, SupervisorStrategy, Terminated}
+import akka.actor.{
+  Actor,
+  ActorRef,
+  ActorRefFactory,
+  ActorSystem,
+  OneForOneStrategy,
+  PoisonPill,
+  Props,
+  Status,
+  SupervisorStrategy,
+  Terminated
+}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
 import akka.http.scaladsl.{ConnectionContext, HttpsConnectionContext}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
@@ -409,7 +420,7 @@ object IdGenerator {
 object Timeout {
   def apply[A](timeout: FiniteDuration)(implicit system: ActorSystem): Future[Unit] = {
     implicit val executionContext = system.dispatcher
-    val prom = Promise[Unit]
+    val prom                      = Promise[Unit]
     system.scheduler.scheduleOnce(timeout) {
       prom.trySuccess(())
     }

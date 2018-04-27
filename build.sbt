@@ -32,7 +32,7 @@ libraryDependencies ++= {
     "org.bouncycastle"       % "bctls-jdk15on"       % bcVersion,
     "com.google.guava"       % "guava"               % "23.0",
     "commons-io"             % "commons-io"          % "2.6",
-    "org.scalatest"         %% "scalatest"           % scalaTestVersion % Test
+    "org.scalatest"          %% "scalatest"          % scalaTestVersion % Test
   )
 }
 

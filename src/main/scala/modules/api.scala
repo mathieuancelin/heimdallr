@@ -4,21 +4,21 @@ import akka.http.scaladsl.model._
 import io.circe.Json
 import io.heimdallr.models._
 
-trait Module {
+trait Module[A] {
   def id: String
   def config: Option[Json] = None
   def state: Option[Json]  = None
 }
 
 // can handle construction mode, maintenance mode
-trait PreconditionModule extends Module {
-  def validatePreconditions(reqId: String, service: Service, request: HttpRequest): Either[HttpResponse, Unit]
+trait PreconditionModule[A] extends Module[A] {
+  def validatePreconditions(reqId: String, service: Service[A], request: HttpRequest): Either[HttpResponse, Unit]
 }
 object PreconditionModule {
-  def validatePreconditions(modules: Seq[PreconditionModule],
-                            reqId: String,
-                            service: Service,
-                            request: HttpRequest): Either[HttpResponse, Unit] = {
+  def validatePreconditions[A](modules: Seq[PreconditionModule[A]],
+                               reqId: String,
+                               service: Service[A],
+                               request: HttpRequest): Either[HttpResponse, Unit] = {
     var index                                     = 0
     var found: Option[Either[HttpResponse, Unit]] = None
     while (found.isEmpty && index < modules.size) {
@@ -34,14 +34,14 @@ object PreconditionModule {
 }
 
 // can handle pass by api, pass by auth0, throttling, gobal throtthling, etc ...
-trait ServiceAccessModule extends Module {
-  def access(reqId: String, service: Service, request: HttpRequest): WithApiKeyOrNot
+trait ServiceAccessModule[A] extends Module[A] {
+  def access(reqId: String, service: Service[A], request: HttpRequest): WithApiKeyOrNot
 }
 object ServiceAccessModule {
-  def access(modules: Seq[ServiceAccessModule],
-             reqId: String,
-             service: Service,
-             request: HttpRequest): WithApiKeyOrNot = {
+  def access[A](modules: Seq[ServiceAccessModule[A]],
+                reqId: String,
+                service: Service[A],
+                request: HttpRequest): WithApiKeyOrNot = {
     var index                          = 0
     var found: Option[WithApiKeyOrNot] = None
     while (found.isEmpty && index < modules.size) {
@@ -58,24 +58,24 @@ object ServiceAccessModule {
 }
 
 // can handle headers additions, like JWT header, request id, API quotas, etc ...
-trait HeadersInTransformationModule extends Module {
+trait HeadersInTransformationModule[A] extends Module[A] {
   def transform(reqId: String,
                 host: String,
-                service: Service,
+                service: Service[A],
                 target: Target,
                 request: HttpRequest,
                 waon: WithApiKeyOrNot,
                 headers: List[HttpHeader]): List[HttpHeader]
 }
 object HeadersInTransformationModule {
-  def transform(modules: Seq[HeadersInTransformationModule],
-                reqId: String,
-                host: String,
-                service: Service,
-                target: Target,
-                request: HttpRequest,
-                waon: WithApiKeyOrNot,
-                headers: List[HttpHeader]): List[HttpHeader] = {
+  def transform[A](modules: Seq[HeadersInTransformationModule[A]],
+                   reqId: String,
+                   host: String,
+                   service: Service[A],
+                   target: Target,
+                   request: HttpRequest,
+                   waon: WithApiKeyOrNot,
+                   headers: List[HttpHeader]): List[HttpHeader] = {
     modules.foldLeft(List.empty[HttpHeader])(
       (seq, module) => seq ++ module.transform(reqId, host, service, target, request, waon, headers)
     )
@@ -83,10 +83,10 @@ object HeadersInTransformationModule {
 }
 
 // can handle headers additions, like JWT header, request id, API quotas, etc ...
-trait HeadersOutTransformationModule extends Module {
+trait HeadersOutTransformationModule[A] extends Module[A] {
   def transform(reqId: String,
                 host: String,
-                service: Service,
+                service: Service[A],
                 target: Target,
                 request: HttpRequest,
                 waon: WithApiKeyOrNot,
@@ -95,16 +95,16 @@ trait HeadersOutTransformationModule extends Module {
                 headers: List[HttpHeader]): List[HttpHeader]
 }
 object HeadersOutTransformationModule {
-  def transform(modules: Seq[HeadersOutTransformationModule],
-                reqId: String,
-                host: String,
-                service: Service,
-                target: Target,
-                request: HttpRequest,
-                waon: WithApiKeyOrNot,
-                proxyLatency: Long,
-                targetLatency: Long,
-                headers: List[HttpHeader]): List[HttpHeader] = {
+  def transform[A](modules: Seq[HeadersOutTransformationModule[A]],
+                   reqId: String,
+                   host: String,
+                   service: Service[A],
+                   target: Target,
+                   request: HttpRequest,
+                   waon: WithApiKeyOrNot,
+                   proxyLatency: Long,
+                   targetLatency: Long,
+                   headers: List[HttpHeader]): List[HttpHeader] = {
     modules.foldLeft(List.empty[HttpHeader])(
       (seq, module) =>
         seq ++ module.transform(reqId, host, service, target, request, waon, proxyLatency, targetLatency, headers)
@@ -113,29 +113,33 @@ object HeadersOutTransformationModule {
 }
 
 // can handle custom template errors
-trait ErrorRendererModule extends Module {
-  def render(reqId: String, status: Int, message: String, service: Option[Service], request: HttpRequest): HttpResponse
-}
-object ErrorRendererModule {
-  def render(modules: Seq[ErrorRendererModule],
-             reqId: String,
+trait ErrorRendererModule[A] extends Module[A] {
+  def render(reqId: String,
              status: Int,
              message: String,
-             service: Option[Service],
-             request: HttpRequest): HttpResponse = {
+             service: Option[Service[A]],
+             request: HttpRequest): HttpResponse
+}
+object ErrorRendererModule {
+  def render[A](modules: Seq[ErrorRendererModule[A]],
+                reqId: String,
+                status: Int,
+                message: String,
+                service: Option[Service[A]],
+                request: HttpRequest): HttpResponse = {
     modules.last.render(reqId, status, message, service, request)
   }
 }
 
 // can handle canary mode
-trait TargetSetChooserModule extends Module {
-  def choose(reqId: String, service: Service, request: HttpRequest): Seq[Target]
+trait TargetSetChooserModule[A] extends Module[A] {
+  def choose(reqId: String, service: Service[A], request: HttpRequest): Seq[Target]
 }
 object TargetSetChooserModule {
-  def choose(modules: Seq[TargetSetChooserModule],
-             reqId: String,
-             service: Service,
-             request: HttpRequest): Seq[Target] = {
+  def choose[A](modules: Seq[TargetSetChooserModule[A]],
+                reqId: String,
+                service: Service[A],
+                request: HttpRequest): Seq[Target] = {
     modules.last.choose(reqId, service, request)
   }
 }

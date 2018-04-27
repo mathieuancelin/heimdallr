@@ -10,6 +10,7 @@ import akka.http.scaladsl.{Http, HttpExt}
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import io.heimdallr.models._
+import io.heimdallr.modules.{Modules, NoExtension}
 import io.heimdallr.util.HttpResponses
 
 import scala.concurrent.duration._
@@ -31,7 +32,7 @@ trait HeimdallrTestCaseHelper {
   def freePort: Int = {
     Try {
       val serverSocket = new ServerSocket(0)
-      val port = serverSocket.getLocalPort
+      val port         = serverSocket.getLocalPort
       serverSocket.close()
       port
     }.toOption.getOrElse(Random.nextInt(1000) + 7000)
@@ -39,26 +40,38 @@ trait HeimdallrTestCaseHelper {
 
   val AbsoluteUri = """(?is)^(https?)://([^/]+)(/.*|$)""".r
 
-  def extractHost(request: HttpRequest): String = request.getHeader("X-Fowarded-Host").asOption.map(_.value()).getOrElse("--")
+  def extractHost(request: HttpRequest): String =
+    request.getHeader("X-Fowarded-Host").asOption.map(_.value()).getOrElse("--")
 
-  def HttpCall(http: HttpExt, port: Int, host: String, path: String, headers: Seq[HttpHeader] = Seq.empty)(implicit executionContext: ExecutionContext, mat: ActorMaterializer): Future[(Int, String, Seq[HttpHeader])] = {
-    http.singleRequest(HttpRequest(
-      method = HttpMethods.GET,
-      protocol = HttpProtocols.`HTTP/1.1`,
-      headers = List(Host(host)) ++ headers,
-      uri = Uri(s"http://127.0.0.1:$port$path")
-    )).flatMap { response =>
-      response.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { body =>
-        (response.status.intValue(), body.utf8String, response.headers)
+  def HttpCall(http: HttpExt, port: Int, host: String, path: String, headers: Seq[HttpHeader] = Seq.empty)(
+      implicit executionContext: ExecutionContext,
+      mat: ActorMaterializer
+  ): Future[(Int, String, Seq[HttpHeader])] = {
+    http
+      .singleRequest(
+        HttpRequest(
+          method = HttpMethods.GET,
+          protocol = HttpProtocols.`HTTP/1.1`,
+          headers = List(Host(host)) ++ headers,
+          uri = Uri(s"http://127.0.0.1:$port$path")
+        )
+      )
+      .flatMap { response =>
+        response.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { body =>
+          (response.status.intValue(), body.utf8String, response.headers)
+        }
       }
-    }
   }
 
-  def HeimdallrInstance(httpPort: Int, services: Seq[Service]): io.heimdallr.Proxy = {
-    io.heimdallr.Proxy.withConfig(ProxyConfig(
-      api = ApiConfig(enabled = false),
-      http = HttpConfig(httpPort = httpPort),
-      services = services)).startAndWait()
+  def HeimdallrInstance(httpPort: Int, services: Seq[Service[NoExtension]]): io.heimdallr.Proxy[NoExtension] = {
+    io.heimdallr.Proxy
+      .withConfig(
+        ProxyConfig(api = ApiConfig(enabled = false), http = HttpConfig(httpPort = httpPort), services = services),
+        Modules.defaultModules,
+        NoExtension.NoExtensionEncoder,
+        NoExtension.NoExtensionDecoder
+      )
+      .startAndWait()
   }
 
   class TargetService(host: Option[String], path: String, contentType: String, result: HttpRequest => String) {
@@ -74,17 +87,23 @@ trait HeimdallrTestCaseHelper {
 
     def handler(request: HttpRequest): Future[HttpResponse] = {
       (request.method, request.uri.path) match {
-        case (HttpMethods.GET, p) if p.toString() == path  && host.isEmpty => {
-          FastFuture.successful(HttpResponse(
-            200,
-            entity = HttpEntity(ContentType.parse(contentType).getOrElse(ContentTypes.`application/json`), ByteString(result(request)))
-          ))
+        case (HttpMethods.GET, p) if p.toString() == path && host.isEmpty => {
+          FastFuture.successful(
+            HttpResponse(
+              200,
+              entity = HttpEntity(ContentType.parse(contentType).getOrElse(ContentTypes.`application/json`),
+                                  ByteString(result(request)))
+            )
+          )
         }
-        case (HttpMethods.GET, p) if p.toString() == path  && extractHost(request) == host.get => {
-          FastFuture.successful(HttpResponse(
-            200,
-            entity = HttpEntity(ContentType.parse(contentType).getOrElse(ContentTypes.`application/json`), ByteString(result(request)))
-          ))
+        case (HttpMethods.GET, p) if p.toString() == path && extractHost(request) == host.get => {
+          FastFuture.successful(
+            HttpResponse(
+              200,
+              entity = HttpEntity(ContentType.parse(contentType).getOrElse(ContentTypes.`application/json`),
+                                  ByteString(result(request)))
+            )
+          )
         }
         case (_, p) => {
           FastFuture.successful(HttpResponses.NotFound(p.toString()))

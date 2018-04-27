@@ -32,19 +32,20 @@ case class ApiKey(clientId: String,
                   enabled: Boolean,
                   metadata: Map[String, String] = Map.empty)
 
-case class Service(id: String,
-                   domain: String,
-                   enabled: Boolean = true,
-                   targets: Seq[Target] = Seq.empty,
-                   apiKeys: Seq[ApiKey] = Seq.empty,
-                   clientConfig: ClientConfig = ClientConfig(),
-                   additionalHeaders: Map[String, String] = Map.empty,
-                   matchingHeaders: Map[String, String] = Map.empty,
-                   targetRoot: String = "",
-                   root: Option[String] = None,
-                   publicPatterns: Set[String] = Set.empty,
-                   privatePatterns: Set[String] = Set.empty,
-                   metadata: Map[String, String] = Map.empty)
+case class Service[A](id: String,
+                      domain: String,
+                      enabled: Boolean = true,
+                      targets: Seq[Target] = Seq.empty,
+                      apiKeys: Seq[ApiKey] = Seq.empty,
+                      clientConfig: ClientConfig = ClientConfig(),
+                      additionalHeaders: Map[String, String] = Map.empty,
+                      matchingHeaders: Map[String, String] = Map.empty,
+                      targetRoot: String = "",
+                      root: Option[String] = None,
+                      publicPatterns: Set[String] = Set.empty,
+                      privatePatterns: Set[String] = Set.empty,
+                      metadata: Map[String, String] = Map.empty,
+                      extension: Option[A] = None)
 
 case class OtoroshiStateConfig(url: String, headers: Map[String, String], pollEvery: FiniteDuration = 10.seconds)
 case class LocalStateConfig(path: String, writeEvery: FiniteDuration = 10.seconds)
@@ -91,43 +92,43 @@ case class ApiConfig(
     enabled: Boolean = true
 )
 
-case class ModulesConfig(modules: Seq[_ <: Module] = Seq.empty) {
-  lazy val PreconditionModules: Seq[PreconditionModule] = modules.collect {
-    case m: PreconditionModule => m
+case class ModulesConfig[A](modules: Seq[_ <: Module[A]] = Seq.empty) {
+  lazy val PreconditionModules: Seq[PreconditionModule[A]] = modules.collect {
+    case m: PreconditionModule[A] => m
   }
-  lazy val ServiceAccessModules: Seq[ServiceAccessModule] = modules.collect {
-    case m: ServiceAccessModule => m
+  lazy val ServiceAccessModules: Seq[ServiceAccessModule[A]] = modules.collect {
+    case m: ServiceAccessModule[A] => m
   }
-  lazy val HeadersInTransformationModules: Seq[HeadersInTransformationModule] = modules.collect {
-    case m: HeadersInTransformationModule => m
+  lazy val HeadersInTransformationModules: Seq[HeadersInTransformationModule[A]] = modules.collect {
+    case m: HeadersInTransformationModule[A] => m
   }
-  lazy val HeadersOutTransformationModules: Seq[HeadersOutTransformationModule] = modules.collect {
-    case m: HeadersOutTransformationModule => m
+  lazy val HeadersOutTransformationModules: Seq[HeadersOutTransformationModule[A]] = modules.collect {
+    case m: HeadersOutTransformationModule[A] => m
   }
-  lazy val ErrorRendererModules: Seq[ErrorRendererModule] = modules.collect {
-    case m: ErrorRendererModule => m
+  lazy val ErrorRendererModules: Seq[ErrorRendererModule[A]] = modules.collect {
+    case m: ErrorRendererModule[A] => m
   }
-  lazy val TargetSetChooserModules: Seq[TargetSetChooserModule] = modules.collect {
-    case m: TargetSetChooserModule => m
+  lazy val TargetSetChooserModules: Seq[TargetSetChooserModule[A]] = modules.collect {
+    case m: TargetSetChooserModule[A] => m
   }
 }
 
 case class LoggersConfig(level: String, configPath: Option[String] = None)
 
-case class ProxyConfig(
+case class ProxyConfig[A](
     http: HttpConfig = HttpConfig(),
     api: ApiConfig = ApiConfig(),
-    services: Seq[Service] = Seq.empty,
+    services: Seq[Service[A]] = Seq.empty,
     state: Option[StateConfig] = None,
     loggers: LoggersConfig = LoggersConfig("INFO"),
     statsd: Option[StatsdConfig] = None
 ) {
-  def pretty: String = Encoders.ProxyConfigEncoder.apply(this).spaces2
+  def pretty(implicit encoders: Encoders[A]): String = encoders.ProxyConfigEncoder.apply(this).spaces2
 }
 
-object Decoders {
+class Decoders[A](decoder: Decoder[A]) {
 
-  import io.heimdallr.models.Decoders._
+  implicit val extensionDecoder = decoder
 
   implicit val FiniteDurationDecoder: Decoder[FiniteDuration] = new Decoder[FiniteDuration] {
     override def apply(c: HCursor): Result[FiniteDuration] =
@@ -144,17 +145,17 @@ object Decoders {
   implicit val TargetDecoder: Decoder[Target]                           = deriveDecoder[Target]
   implicit val ClientConfigDecoder: Decoder[ClientConfig]               = deriveDecoder[ClientConfig]
   implicit val ApiKeyDecoder: Decoder[ApiKey]                           = deriveDecoder[ApiKey]
-  implicit val ServiceDecoder: Decoder[Service]                         = deriveDecoder[Service]
-  implicit val SeqOfServiceDecoder: Decoder[Seq[Service]]               = Decoder.decodeSeq(ServiceDecoder)
+  implicit val ServiceDecoder: Decoder[Service[A]]                      = deriveDecoder[Service[A]]
+  implicit val SeqOfServiceDecoder: Decoder[Seq[Service[A]]]            = Decoder.decodeSeq(ServiceDecoder)
   implicit val HttpConfigDecoder: Decoder[HttpConfig]                   = deriveDecoder[HttpConfig]
   implicit val ApiConfigDecoder: Decoder[ApiConfig]                     = deriveDecoder[ApiConfig]
   implicit val LoggersConfigDecoder: Decoder[LoggersConfig]             = deriveDecoder[LoggersConfig]
-  implicit val ProxyConfigDecoder: Decoder[ProxyConfig]                 = deriveDecoder[ProxyConfig]
+  implicit val ProxyConfigDecoder: Decoder[ProxyConfig[A]]              = deriveDecoder[ProxyConfig[A]]
 }
 
-object Encoders {
+class Encoders[A](encoder: Encoder[A]) {
 
-  import io.heimdallr.models.Encoders._
+  implicit val extensionEncoder = encoder
 
   implicit val FiniteDurationEncoder: Encoder[FiniteDuration] = new Encoder[FiniteDuration] {
     override def apply(a: FiniteDuration): Json = Json.fromLong(a.toMillis)
@@ -170,12 +171,12 @@ object Encoders {
   implicit val TargetEncoder: Encoder[Target]                           = deriveEncoder[Target]
   implicit val ClientConfigEncoder: Encoder[ClientConfig]               = deriveEncoder[ClientConfig]
   implicit val ApiKeyEncoder: Encoder[ApiKey]                           = deriveEncoder[ApiKey]
-  implicit val ServiceEncoder: Encoder[Service]                         = deriveEncoder[Service]
-  implicit val SeqOfServiceEncoder: Encoder[Seq[Service]]               = Encoder.encodeSeq(ServiceEncoder)
+  implicit val ServiceEncoder: Encoder[Service[A]]                      = deriveEncoder[Service[A]]
+  implicit val SeqOfServiceEncoder: Encoder[Seq[Service[A]]]            = Encoder.encodeSeq(ServiceEncoder)
   implicit val HttpConfigEncoder: Encoder[HttpConfig]                   = deriveEncoder[HttpConfig]
   implicit val ApiConfigEncoder: Encoder[ApiConfig]                     = deriveEncoder[ApiConfig]
   implicit val LoggersConfigEncoder: Encoder[LoggersConfig]             = deriveEncoder[LoggersConfig]
-  implicit val ProxyConfigEncoder: Encoder[ProxyConfig]                 = deriveEncoder[ProxyConfig]
+  implicit val ProxyConfigEncoder: Encoder[ProxyConfig[A]]              = deriveEncoder[ProxyConfig[A]]
 }
 
 sealed trait WithApiKeyOrNot
@@ -189,54 +190,54 @@ case object PrivateCall extends CallRestriction
 
 case class ConfigError(message: String)
 
-trait Command {
+trait Command[A] {
   def command: String
-  def modify(state: Seq[Service]): Seq[Service]
-  def applyModification(store: Store): Json = {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]]
+  def applyModification(store: Store[A], encoders: Encoders[A]): Json = {
     store.modify(s => modify(s.values.flatten.toSeq).groupBy(_.domain))
     Json.obj("result" -> Json.fromString("command applied"))
   }
 }
 
-case class NothingCommand(command: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = state
+case class NothingCommand[A](command: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = state
 }
 
-case class GetStateCommand(command: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = state
-  override def applyModification(store: Store): Json = {
+case class GetStateCommand[A](command: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = state
+  override def applyModification(store: Store[A], encoders: Encoders[A]): Json = {
     val seq = store.get().values.flatten.toSeq
-    Json.obj("state" -> Encoders.SeqOfServiceEncoder(seq))
+    Json.obj("state" -> encoders.SeqOfServiceEncoder(seq))
   }
 }
 
-case class GetServiceCommand(command: String, serviceId: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = state
-  override def applyModification(store: Store): Json = {
+case class GetServiceCommand[A](command: String, serviceId: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = state
+  override def applyModification(store: Store[A], encoders: Encoders[A]): Json = {
     store.get().values.flatten.toSeq.find(_.id == serviceId) match {
-      case Some(service) => Encoders.ServiceEncoder(service)
+      case Some(service) => encoders.ServiceEncoder(service)
       case None          => Json.obj("error" -> Json.fromString("not found"))
     }
   }
 }
 
-case class GetMetricsCommand(command: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = state
-  override def applyModification(store: Store): Json = {
+case class GetMetricsCommand[A](command: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = state
+  override def applyModification(store: Store[A], encoders: Encoders[A]): Json = {
     Json.obj("metrics" -> Json.obj())
   }
 }
 
-case class LoadStateCommand(command: String, serviceId: String, services: Seq[Service]) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = services
+case class LoadStateCommand[A](command: String, serviceId: String, services: Seq[Service[A]]) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = services
 }
 
-case class AddServiceCommand(command: String, service: Service) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = state :+ service
+case class AddServiceCommand[A](command: String, service: Service[A]) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = state :+ service
 }
 
-case class UpdateServiceCommand(command: String, serviceId: String, updatedService: Service) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class UpdateServiceCommand[A](command: String, serviceId: String, updatedService: Service[A]) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -249,12 +250,12 @@ case class UpdateServiceCommand(command: String, serviceId: String, updatedServi
   }
 }
 
-case class RemoveServiceCommand(command: String, serviceId: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = state.filterNot(_.id == serviceId)
+case class RemoveServiceCommand[A](command: String, serviceId: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = state.filterNot(_.id == serviceId)
 }
 
-case class ChangeDomainCommand(command: String, serviceId: String, domain: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class ChangeDomainCommand[A](command: String, serviceId: String, domain: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -267,8 +268,8 @@ case class ChangeDomainCommand(command: String, serviceId: String, domain: Strin
   }
 }
 
-case class AddTargetCommand(command: String, serviceId: String, target: Target) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class AddTargetCommand[A](command: String, serviceId: String, target: Target) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -281,8 +282,8 @@ case class AddTargetCommand(command: String, serviceId: String, target: Target) 
   }
 }
 
-case class RemoveTargetCommand(command: String, serviceId: String, target: Target) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class RemoveTargetCommand[A](command: String, serviceId: String, target: Target) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -295,8 +296,8 @@ case class RemoveTargetCommand(command: String, serviceId: String, target: Targe
   }
 }
 
-case class AddApiKeyCommand(command: String, serviceId: String, apiKey: ApiKey) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class AddApiKeyCommand[A](command: String, serviceId: String, apiKey: ApiKey) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -309,8 +310,8 @@ case class AddApiKeyCommand(command: String, serviceId: String, apiKey: ApiKey) 
   }
 }
 
-case class UpdateApiKeyCommand(command: String, serviceId: String, apiKey: ApiKey) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class UpdateApiKeyCommand[A](command: String, serviceId: String, apiKey: ApiKey) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -323,8 +324,8 @@ case class UpdateApiKeyCommand(command: String, serviceId: String, apiKey: ApiKe
   }
 }
 
-case class RemoveApiKeyCommand(command: String, serviceId: String, apiKey: ApiKey) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class RemoveApiKeyCommand[A](command: String, serviceId: String, apiKey: ApiKey) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -337,8 +338,8 @@ case class RemoveApiKeyCommand(command: String, serviceId: String, apiKey: ApiKe
   }
 }
 
-case class EnableApiKeyCommand(command: String, serviceId: String, clientId: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class EnableApiKeyCommand[A](command: String, serviceId: String, clientId: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -352,8 +353,8 @@ case class EnableApiKeyCommand(command: String, serviceId: String, clientId: Str
   }
 }
 
-case class DisabledApiKeyCommand(command: String, serviceId: String, clientId: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class DisabledApiKeyCommand[A](command: String, serviceId: String, clientId: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -367,8 +368,8 @@ case class DisabledApiKeyCommand(command: String, serviceId: String, clientId: S
   }
 }
 
-case class ToggleApiKeyCommand(command: String, serviceId: String, clientId: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class ToggleApiKeyCommand[A](command: String, serviceId: String, clientId: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -382,8 +383,8 @@ case class ToggleApiKeyCommand(command: String, serviceId: String, clientId: Str
   }
 }
 
-case class ResetApiKeyCommand(command: String, serviceId: String, clientId: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class ResetApiKeyCommand[A](command: String, serviceId: String, clientId: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -397,8 +398,8 @@ case class ResetApiKeyCommand(command: String, serviceId: String, clientId: Stri
   }
 }
 
-case class UpdateClientConfigCommand(command: String, serviceId: String, config: ClientConfig) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class UpdateClientConfigCommand[A](command: String, serviceId: String, config: ClientConfig) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -411,8 +412,9 @@ case class UpdateClientConfigCommand(command: String, serviceId: String, config:
   }
 }
 
-case class AddAdditionalHeaderCommand(command: String, serviceId: String, name: String, value: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class AddAdditionalHeaderCommand[A](command: String, serviceId: String, name: String, value: String)
+    extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -425,8 +427,8 @@ case class AddAdditionalHeaderCommand(command: String, serviceId: String, name: 
   }
 }
 
-case class RemoveAdditionalHeaderCommand(command: String, serviceId: String, name: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class RemoveAdditionalHeaderCommand[A](command: String, serviceId: String, name: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -439,9 +441,9 @@ case class RemoveAdditionalHeaderCommand(command: String, serviceId: String, nam
   }
 }
 
-case class UpdateAdditionalHeaderCommand(command: String, serviceId: String, name: String, value: String)
-    extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class UpdateAdditionalHeaderCommand[A](command: String, serviceId: String, name: String, value: String)
+    extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -454,8 +456,9 @@ case class UpdateAdditionalHeaderCommand(command: String, serviceId: String, nam
   }
 }
 
-case class AddMatchingHeaderCommand(command: String, serviceId: String, name: String, value: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class AddMatchingHeaderCommand[A](command: String, serviceId: String, name: String, value: String)
+    extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -468,8 +471,8 @@ case class AddMatchingHeaderCommand(command: String, serviceId: String, name: St
   }
 }
 
-case class RemoveMatchingHeaderCommand(command: String, serviceId: String, name: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class RemoveMatchingHeaderCommand[A](command: String, serviceId: String, name: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -482,9 +485,9 @@ case class RemoveMatchingHeaderCommand(command: String, serviceId: String, name:
   }
 }
 
-case class UpdateMatchingHeaderCommand(command: String, serviceId: String, name: String, value: String)
-    extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class UpdateMatchingHeaderCommand[A](command: String, serviceId: String, name: String, value: String)
+    extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -497,8 +500,8 @@ case class UpdateMatchingHeaderCommand(command: String, serviceId: String, name:
   }
 }
 
-case class UpdateTargetRootCommand(command: String, serviceId: String, root: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class UpdateTargetRootCommand[A](command: String, serviceId: String, root: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -511,8 +514,8 @@ case class UpdateTargetRootCommand(command: String, serviceId: String, root: Str
   }
 }
 
-case class AddPublicPatternCommand(command: String, serviceId: String, pattern: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class AddPublicPatternCommand[A](command: String, serviceId: String, pattern: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -525,8 +528,8 @@ case class AddPublicPatternCommand(command: String, serviceId: String, pattern: 
   }
 }
 
-case class RemovePublicPatternCommand(command: String, serviceId: String, pattern: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class RemovePublicPatternCommand[A](command: String, serviceId: String, pattern: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -539,8 +542,8 @@ case class RemovePublicPatternCommand(command: String, serviceId: String, patter
   }
 }
 
-case class AddPrivatePatternCommand(command: String, serviceId: String, pattern: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class AddPrivatePatternCommand[A](command: String, serviceId: String, pattern: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -553,8 +556,8 @@ case class AddPrivatePatternCommand(command: String, serviceId: String, pattern:
   }
 }
 
-case class RemovePrivatePatternCommand(command: String, serviceId: String, pattern: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class RemovePrivatePatternCommand[A](command: String, serviceId: String, pattern: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -567,8 +570,8 @@ case class RemovePrivatePatternCommand(command: String, serviceId: String, patte
   }
 }
 
-case class UpdateRootCommand(command: String, serviceId: String, root: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class UpdateRootCommand[A](command: String, serviceId: String, root: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -581,8 +584,8 @@ case class UpdateRootCommand(command: String, serviceId: String, root: String) e
   }
 }
 
-case class RemoveRootCommand(command: String, serviceId: String) extends Command {
-  def modify(state: Seq[Service]): Seq[Service] = {
+case class RemoveRootCommand[A](command: String, serviceId: String) extends Command[A] {
+  def modify(state: Seq[Service[A]]): Seq[Service[A]] = {
     state
       .find(_.id == serviceId)
       .map { service =>
@@ -595,49 +598,52 @@ case class RemoveRootCommand(command: String, serviceId: String) extends Command
   }
 }
 
-object Command {
+class Commands[A](decoders: Decoders[A]) {
 
-  import io.heimdallr.models.Decoders._
+  import decoders._
 
-  val AddServiceCommandDecoder: Decoder[AddServiceCommand]                   = deriveDecoder[AddServiceCommand]
-  val UpdateServiceCommandDecoder: Decoder[UpdateServiceCommand]             = deriveDecoder[UpdateServiceCommand]
-  val RemoveServiceCommandDecoder: Decoder[RemoveServiceCommand]             = deriveDecoder[RemoveServiceCommand]
-  val NothingCommandDecoder: Decoder[NothingCommand]                         = deriveDecoder[NothingCommand]
-  val LoadStateCommandDecoder: Decoder[LoadStateCommand]                     = deriveDecoder[LoadStateCommand]
-  val GetStateCommandDecoder: Decoder[GetStateCommand]                       = deriveDecoder[GetStateCommand]
-  val GetServiceCommand: Decoder[GetServiceCommand]                          = deriveDecoder[GetServiceCommand]
-  val GetMetricsCommandDecoder: Decoder[GetMetricsCommand]                   = deriveDecoder[GetMetricsCommand]
-  val ChangeDomainCommandDecoder: Decoder[ChangeDomainCommand]               = deriveDecoder[ChangeDomainCommand]
-  val AddTargetCommandDecoder: Decoder[AddTargetCommand]                     = deriveDecoder[AddTargetCommand]
-  val RemoveTargetCommandDecoder: Decoder[RemoveTargetCommand]               = deriveDecoder[RemoveTargetCommand]
-  val AddApiKeyCommandDecoder: Decoder[AddApiKeyCommand]                     = deriveDecoder[AddApiKeyCommand]
-  val UpdateApiKeyCommandDecoder: Decoder[UpdateApiKeyCommand]               = deriveDecoder[UpdateApiKeyCommand]
-  val RemoveApiKeyCommandDecoder: Decoder[RemoveApiKeyCommand]               = deriveDecoder[RemoveApiKeyCommand]
-  val EnableApiKeyCommandDecoder: Decoder[EnableApiKeyCommand]               = deriveDecoder[EnableApiKeyCommand]
-  val DisabledApiKeyCommandDecoder: Decoder[DisabledApiKeyCommand]           = deriveDecoder[DisabledApiKeyCommand]
-  val ToggleApiKeyCommandDecoder: Decoder[ToggleApiKeyCommand]               = deriveDecoder[ToggleApiKeyCommand]
-  val ResetApiKeyCommandDecoder: Decoder[ResetApiKeyCommand]                 = deriveDecoder[ResetApiKeyCommand]
-  val UpdateClientConfigCommandDecoder: Decoder[UpdateClientConfigCommand]   = deriveDecoder[UpdateClientConfigCommand]
-  val AddAdditionalHeaderCommandDecoder: Decoder[AddAdditionalHeaderCommand] = deriveDecoder[AddAdditionalHeaderCommand]
-  val RemoveAdditionalHeaderCommandDecoder: Decoder[RemoveAdditionalHeaderCommand] =
-    deriveDecoder[RemoveAdditionalHeaderCommand]
-  val UpdateAdditionalHeaderCommandDecoder: Decoder[UpdateAdditionalHeaderCommand] =
-    deriveDecoder[UpdateAdditionalHeaderCommand]
-  val AddMatchingHeaderCommandDecoder: Decoder[AddMatchingHeaderCommand] = deriveDecoder[AddMatchingHeaderCommand]
-  val RemoveMatchingHeaderCommandDecoder: Decoder[RemoveMatchingHeaderCommand] =
-    deriveDecoder[RemoveMatchingHeaderCommand]
-  val UpdateMatchingHeaderCommandDecoder: Decoder[UpdateMatchingHeaderCommand] =
-    deriveDecoder[UpdateMatchingHeaderCommand]
-  val UpdateTargetRootCommandDecoder: Decoder[UpdateTargetRootCommand]       = deriveDecoder[UpdateTargetRootCommand]
-  val AddPublicPatternCommandDecoder: Decoder[AddPublicPatternCommand]       = deriveDecoder[AddPublicPatternCommand]
-  val RemovePublicPatternCommandDecoder: Decoder[RemovePublicPatternCommand] = deriveDecoder[RemovePublicPatternCommand]
-  val AddPrivatePatternCommandDecoder: Decoder[AddPrivatePatternCommand]     = deriveDecoder[AddPrivatePatternCommand]
-  val RemovePrivatePatternCommandDecoder: Decoder[RemovePrivatePatternCommand] =
-    deriveDecoder[RemovePrivatePatternCommand]
-  val UpdateRootCommandDecoder: Decoder[UpdateRootCommand] = deriveDecoder[UpdateRootCommand]
-  val RemoveRootCommandDecoder: Decoder[RemoveRootCommand] = deriveDecoder[RemoveRootCommand]
+  val AddServiceCommandDecoder: Decoder[AddServiceCommand[A]]         = deriveDecoder[AddServiceCommand[A]]
+  val UpdateServiceCommandDecoder: Decoder[UpdateServiceCommand[A]]   = deriveDecoder[UpdateServiceCommand[A]]
+  val RemoveServiceCommandDecoder: Decoder[RemoveServiceCommand[A]]   = deriveDecoder[RemoveServiceCommand[A]]
+  val NothingCommandDecoder: Decoder[NothingCommand[A]]               = deriveDecoder[NothingCommand[A]]
+  val LoadStateCommandDecoder: Decoder[LoadStateCommand[A]]           = deriveDecoder[LoadStateCommand[A]]
+  val GetStateCommandDecoder: Decoder[GetStateCommand[A]]             = deriveDecoder[GetStateCommand[A]]
+  val GetServiceCommand: Decoder[GetServiceCommand[A]]                = deriveDecoder[GetServiceCommand[A]]
+  val GetMetricsCommandDecoder: Decoder[GetMetricsCommand[A]]         = deriveDecoder[GetMetricsCommand[A]]
+  val ChangeDomainCommandDecoder: Decoder[ChangeDomainCommand[A]]     = deriveDecoder[ChangeDomainCommand[A]]
+  val AddTargetCommandDecoder: Decoder[AddTargetCommand[A]]           = deriveDecoder[AddTargetCommand[A]]
+  val RemoveTargetCommandDecoder: Decoder[RemoveTargetCommand[A]]     = deriveDecoder[RemoveTargetCommand[A]]
+  val AddApiKeyCommandDecoder: Decoder[AddApiKeyCommand[A]]           = deriveDecoder[AddApiKeyCommand[A]]
+  val UpdateApiKeyCommandDecoder: Decoder[UpdateApiKeyCommand[A]]     = deriveDecoder[UpdateApiKeyCommand[A]]
+  val RemoveApiKeyCommandDecoder: Decoder[RemoveApiKeyCommand[A]]     = deriveDecoder[RemoveApiKeyCommand[A]]
+  val EnableApiKeyCommandDecoder: Decoder[EnableApiKeyCommand[A]]     = deriveDecoder[EnableApiKeyCommand[A]]
+  val DisabledApiKeyCommandDecoder: Decoder[DisabledApiKeyCommand[A]] = deriveDecoder[DisabledApiKeyCommand[A]]
+  val ToggleApiKeyCommandDecoder: Decoder[ToggleApiKeyCommand[A]]     = deriveDecoder[ToggleApiKeyCommand[A]]
+  val ResetApiKeyCommandDecoder: Decoder[ResetApiKeyCommand[A]]       = deriveDecoder[ResetApiKeyCommand[A]]
+  val UpdateClientConfigCommandDecoder: Decoder[UpdateClientConfigCommand[A]] =
+    deriveDecoder[UpdateClientConfigCommand[A]]
+  val AddAdditionalHeaderCommandDecoder: Decoder[AddAdditionalHeaderCommand[A]] =
+    deriveDecoder[AddAdditionalHeaderCommand[A]]
+  val RemoveAdditionalHeaderCommandDecoder: Decoder[RemoveAdditionalHeaderCommand[A]] =
+    deriveDecoder[RemoveAdditionalHeaderCommand[A]]
+  val UpdateAdditionalHeaderCommandDecoder: Decoder[UpdateAdditionalHeaderCommand[A]] =
+    deriveDecoder[UpdateAdditionalHeaderCommand[A]]
+  val AddMatchingHeaderCommandDecoder: Decoder[AddMatchingHeaderCommand[A]] = deriveDecoder[AddMatchingHeaderCommand[A]]
+  val RemoveMatchingHeaderCommandDecoder: Decoder[RemoveMatchingHeaderCommand[A]] =
+    deriveDecoder[RemoveMatchingHeaderCommand[A]]
+  val UpdateMatchingHeaderCommandDecoder: Decoder[UpdateMatchingHeaderCommand[A]] =
+    deriveDecoder[UpdateMatchingHeaderCommand[A]]
+  val UpdateTargetRootCommandDecoder: Decoder[UpdateTargetRootCommand[A]] = deriveDecoder[UpdateTargetRootCommand[A]]
+  val AddPublicPatternCommandDecoder: Decoder[AddPublicPatternCommand[A]] = deriveDecoder[AddPublicPatternCommand[A]]
+  val RemovePublicPatternCommandDecoder: Decoder[RemovePublicPatternCommand[A]] =
+    deriveDecoder[RemovePublicPatternCommand[A]]
+  val AddPrivatePatternCommandDecoder: Decoder[AddPrivatePatternCommand[A]] = deriveDecoder[AddPrivatePatternCommand[A]]
+  val RemovePrivatePatternCommandDecoder: Decoder[RemovePrivatePatternCommand[A]] =
+    deriveDecoder[RemovePrivatePatternCommand[A]]
+  val UpdateRootCommandDecoder: Decoder[UpdateRootCommand[A]] = deriveDecoder[UpdateRootCommand[A]]
+  val RemoveRootCommandDecoder: Decoder[RemoveRootCommand[A]] = deriveDecoder[RemoveRootCommand[A]]
 
-  def decode(command: String, json: Json): Decoder.Result[Command] = {
+  def decode(command: String, json: Json): Decoder.Result[Command[A]] = {
     command match {
       case "NothingCommand"                => NothingCommandDecoder.decodeJson(json)
       case "AddServiceCommand"             => AddServiceCommandDecoder.decodeJson(json)

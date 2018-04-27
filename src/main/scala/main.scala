@@ -2,7 +2,9 @@ package io.heimdallr
 
 import io.heimdallr.models.{ApiKey, ProxyConfig, Service, Target}
 import org.slf4j.LoggerFactory
-import java.io.File;
+import java.io.File
+
+import io.heimdallr.modules.{Modules, NoExtension};
 
 object Main {
 
@@ -34,7 +36,7 @@ object Main {
 
     val logger = LoggerFactory.getLogger("heimdallr")
 
-    val demoConfig = ProxyConfig(
+    val demoConfig = ProxyConfig[NoExtension](
       // statePath = Some("./state.json"),
       services = Seq(
         Service(
@@ -92,15 +94,30 @@ object Main {
 
     args
       .find(_.equals("--demo"))
-      .map(_ => Proxy.withConfig(demoConfig).copy(modules = modules.Modules.defaultModules).start().stopOnShutdown())
+      .map(
+        _ =>
+          Proxy
+            .withConfig[NoExtension](demoConfig,
+                                     Modules.defaultModules,
+                                     NoExtension.NoExtensionEncoder,
+                                     NoExtension.NoExtensionDecoder)
+            .start()
+            .stopOnShutdown()
+      )
       .orElse(args.find(_.startsWith("--proxy.config=")).map(_.replace("--proxy.config=", "")).map { path =>
-        Proxy.fromConfigPath(path) match {
+        Proxy.fromConfigPath[NoExtension](path,
+                                          Modules.defaultModules,
+                                          NoExtension.NoExtensionEncoder,
+                                          NoExtension.NoExtensionDecoder) match {
           case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
           case Right(proxy) => {
             val configFile   = new File(path)
-            val startedProxy = proxy.copy(modules = modules.Modules.defaultModules).start().stopOnShutdown()
+            val startedProxy = proxy.start().stopOnShutdown()
             watchFile(configFile) { f =>
-              Proxy.readProxyConfigFromFile(configFile, true) match {
+              Proxy.readProxyConfigFromFile(configFile,
+                                            true,
+                                            NoExtension.NoExtensionEncoder,
+                                            NoExtension.NoExtensionDecoder) match {
                 case Left(e)       => logger.error(s"Error while loading config file @ $path: $e")
                 case Right(config) => startedProxy.updateState(_ => config.services)
               }
@@ -110,13 +127,19 @@ object Main {
       })
       .getOrElse {
         val path = "./heimdallr.conf"
-        Proxy.fromConfigPath(path) match {
+        Proxy.fromConfigPath[NoExtension](path,
+                                          Modules.defaultModules,
+                                          NoExtension.NoExtensionEncoder,
+                                          NoExtension.NoExtensionDecoder) match {
           case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
           case Right(proxy) => {
             val configFile   = new File(path)
-            val startedProxy = proxy.copy(modules = modules.Modules.defaultModules).start().stopOnShutdown()
+            val startedProxy = proxy.start().stopOnShutdown()
             watchFile(configFile) { f =>
-              Proxy.readProxyConfigFromFile(configFile, true) match {
+              Proxy.readProxyConfigFromFile(configFile,
+                                            true,
+                                            NoExtension.NoExtensionEncoder,
+                                            NoExtension.NoExtensionDecoder) match {
                 case Left(e)       => logger.error(s"Error while loading config file @ $path: $e")
                 case Right(config) => startedProxy.updateState(_ => config.services)
               }

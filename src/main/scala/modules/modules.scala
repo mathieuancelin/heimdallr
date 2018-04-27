@@ -6,14 +6,30 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import io.circe.Json
+import io.circe.Decoder.Result
+import io.circe.{Decoder, Encoder, HCursor, Json}
 import io.heimdallr.models._
 import io.heimdallr.util.Implicits._
 
 import scala.util.Try
 
+case class NoExtension()
+
+object NoExtension {
+
+  val singleton = NoExtension()
+
+  implicit val NoExtensionDecoder: Decoder[NoExtension] = new Decoder[NoExtension] {
+    override def apply(c: HCursor): Result[NoExtension] = Right(NoExtension())
+  }
+
+  implicit val NoExtensionEncoder: Encoder[NoExtension] = new Encoder[NoExtension] {
+    override def apply(a: NoExtension): Json = Json.Null
+  }
+}
+
 object Modules {
-  val defaultModules: ModulesConfig = ModulesConfig(
+  val defaultModules: ModulesConfig[NoExtension] = ModulesConfig(
     Seq(
       new DefaultPreconditionModule(),
       new DefaultServiceAccessModule(),
@@ -25,12 +41,12 @@ object Modules {
   )
 }
 
-class DefaultPreconditionModule extends PreconditionModule {
+class DefaultPreconditionModule extends PreconditionModule[NoExtension] {
 
   override def id: String = "DefaultPreconditionModule"
 
   override def validatePreconditions(reqId: String,
-                                     service: Service,
+                                     service: Service[NoExtension],
                                      request: HttpRequest): Either[HttpResponse, Unit] = {
     if (service.enabled) {
       Right(())
@@ -48,7 +64,7 @@ class DefaultPreconditionModule extends PreconditionModule {
   }
 }
 
-class DefaultServiceAccessModule extends ServiceAccessModule {
+class DefaultServiceAccessModule extends ServiceAccessModule[NoExtension] {
 
   val authHeaderName = "Proxy-Authorization"
 
@@ -56,7 +72,7 @@ class DefaultServiceAccessModule extends ServiceAccessModule {
 
   override def id: String = "DefaultServiceAccessModule"
 
-  override def access(reqId: String, service: Service, request: HttpRequest): WithApiKeyOrNot = {
+  override def access(reqId: String, service: Service[NoExtension], request: HttpRequest): WithApiKeyOrNot = {
     request.getHeader(authHeaderName).asOption.flatMap { header =>
       Try {
         val value = header.value()
@@ -95,7 +111,7 @@ class DefaultServiceAccessModule extends ServiceAccessModule {
   }
 }
 
-class DefaultHeadersInTransformationModule extends HeadersInTransformationModule {
+class DefaultHeadersInTransformationModule extends HeadersInTransformationModule[NoExtension] {
 
   val authHeaderName = "Proxy-Authorization"
 
@@ -103,7 +119,7 @@ class DefaultHeadersInTransformationModule extends HeadersInTransformationModule
 
   override def transform(reqId: String,
                          host: String,
-                         service: Service,
+                         service: Service[NoExtension],
                          target: Target,
                          request: HttpRequest,
                          waon: WithApiKeyOrNot,
@@ -116,13 +132,13 @@ class DefaultHeadersInTransformationModule extends HeadersInTransformationModule
   }
 }
 
-class DefaultHeadersOutTransformationModule extends HeadersOutTransformationModule {
+class DefaultHeadersOutTransformationModule extends HeadersOutTransformationModule[NoExtension] {
 
   override def id: String = "DefaultHeadersOutTransformationModule"
 
   override def transform(reqId: String,
                          host: String,
-                         service: Service,
+                         service: Service[NoExtension],
                          target: Target,
                          request: HttpRequest,
                          waon: WithApiKeyOrNot,
@@ -135,14 +151,14 @@ class DefaultHeadersOutTransformationModule extends HeadersOutTransformationModu
   }
 }
 
-class DefaultErrorRendererModule extends ErrorRendererModule {
+class DefaultErrorRendererModule extends ErrorRendererModule[NoExtension] {
 
   override def id: String = "DefaultErrorRendererModule"
 
   override def render(reqId: String,
                       status: Int,
                       message: String,
-                      service: Option[Service],
+                      service: Option[Service[NoExtension]],
                       request: HttpRequest): HttpResponse = HttpResponse(
     status,
     entity = HttpEntity(ContentTypes.`application/json`,
@@ -150,9 +166,9 @@ class DefaultErrorRendererModule extends ErrorRendererModule {
   )
 }
 
-class DefaultTargetSetChooserModule extends TargetSetChooserModule {
+class DefaultTargetSetChooserModule extends TargetSetChooserModule[NoExtension] {
 
   override def id: String = "DefaultTargetSetChooserModule"
 
-  override def choose(reqId: String, service: Service, request: HttpRequest): Seq[Target] = service.targets
+  override def choose(reqId: String, service: Service[NoExtension], request: HttpRequest): Seq[Target] = service.targets
 }

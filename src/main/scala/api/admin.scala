@@ -18,16 +18,20 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
-class AdminApi(config: ProxyConfig, store: Store, metrics: Statsd)
-    extends Startable[AdminApi]
-    with Stoppable[AdminApi] {
+class AdminApi[A](config: ProxyConfig[A],
+                  store: Store[A],
+                  metrics: Statsd[A],
+                  commands: Commands[A],
+                  encoders: Encoders[A])
+    extends Startable[AdminApi[A]]
+    with Stoppable[AdminApi[A]] {
 
   implicit val system       = ActorSystem()
   implicit val executor     = system.dispatcher
   implicit val materializer = ActorMaterializer()
   implicit val http         = Http(system)
 
-  val boundHttp = Promise[ServerBinding]
+  val boundHttp  = Promise[ServerBinding]
   val boundHttps = Promise[ServerBinding]
 
   lazy val logger = LoggerFactory.getLogger("heimdallr")
@@ -35,12 +39,12 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: Statsd)
   def handler(request: HttpRequest): Future[HttpResponse] = {
     (request.method, request.uri.path) match {
       case (HttpMethods.GET, Uri.Path("/api/services")) => {
-        FastFuture.successful(Ok(Encoders.SeqOfServiceEncoder(store.get().values.flatten.toSeq)))
+        FastFuture.successful(Ok(encoders.SeqOfServiceEncoder(store.get().values.flatten.toSeq)))
       }
       case (HttpMethods.GET, path) if path.startsWith(Uri.Path("/api/services/")) => {
         val serviceId = path.toString.replace("/api/services/", "")
         store.get().values.flatten.toSeq.find(_.id == serviceId) match {
-          case Some(service) => FastFuture.successful(Ok(Encoders.ServiceEncoder(service)))
+          case Some(service) => FastFuture.successful(Ok(encoders.ServiceEncoder(service)))
           case None          => FastFuture.successful(NotFound(s"Service with id $serviceId does not exist"))
         }
       }
@@ -51,9 +55,9 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: Statsd)
             case Left(_) => BadRequest("Error while parsing body")
             case Right(json) =>
               logger.info(s"received command: ${json.noSpaces}")
-              Command.decode(json.hcursor.downField("command").as[String].getOrElse("none"), json) match {
+              commands.decode(json.hcursor.downField("command").as[String].getOrElse("none"), json) match {
                 case Left(_)        => BadRequest("Error while parsing command")
-                case Right(command) => Ok(command.applyModification(store))
+                case Right(command) => Ok(command.applyModification(store, encoders))
               }
           }
         }
@@ -61,20 +65,22 @@ class AdminApi(config: ProxyConfig, store: Store, metrics: Statsd)
     }
   }
 
-  def start(): Stoppable[AdminApi] = {
+  def start(): Stoppable[AdminApi[A]] = {
     logger.info(s"Listening for api commands on http://${config.api.listenOn}:${config.api.httpPort}")
     http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpPort).andThen {
       case Success(sb) => boundHttp.trySuccess(sb)
-      case Failure(e) => boundHttp.tryFailure(e)
+      case Failure(e)  => boundHttp.tryFailure(e)
     }
     config.api.certPath.foreach { path =>
       val httpsContext =
         HttpsSupport.context(path, config.api.keyPath, config.api.certPass.get, config.api.keyStoreType)
       logger.info(s"Listening for api commands on https://${config.api.listenOn}:${config.api.httpsPort}")
-      http.bindAndHandleAsync(handler, config.api.listenOn, config.api.httpsPort, connectionContext = httpsContext).andThen {
-        case Success(sb) => boundHttp.trySuccess(sb)
-        case Failure(e) => boundHttp.tryFailure(e)
-      }
+      http
+        .bindAndHandleAsync(handler, config.api.listenOn, config.api.httpsPort, connectionContext = httpsContext)
+        .andThen {
+          case Success(sb) => boundHttp.trySuccess(sb)
+          case Failure(e)  => boundHttp.tryFailure(e)
+        }
     }
     this
   }

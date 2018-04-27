@@ -24,9 +24,9 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.{Future, Promise, TimeoutException}
 import scala.util.{Failure, Success}
 
-class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, statsd: Statsd)
-    extends Startable[HttpProxy]
-    with Stoppable[HttpProxy] {
+class HttpProxy[A](config: ProxyConfig[A], store: Store[A], modules: ModulesConfig[A], statsd: Statsd[A])
+    extends Startable[HttpProxy[A]]
+    with Stoppable[HttpProxy[A]] {
 
   implicit val system       = ActorSystem()
   implicit val executor     = system.dispatcher
@@ -35,7 +35,7 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, stats
 
   lazy val logger = LoggerFactory.getLogger("heimdallr")
 
-  val boundHttp = Promise[ServerBinding]
+  val boundHttp  = Promise[ServerBinding]
   val boundHttps = Promise[ServerBinding]
 
   val AbsoluteUri = """(?is)^(https?)://([^/]+)(/.*|$)""".r
@@ -52,11 +52,11 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, stats
     case _                                                     => request.header[Host].map(_.host.address()).getOrElse("--")
   }
 
-  def findService(host: String, path: Uri.Path, headers: Map[String, HttpHeader]): Option[Service] = {
+  def findService(host: String, path: Uri.Path, headers: Map[String, HttpHeader]): Option[Service[A]] = {
     val uri = path.toString()
 
     @inline
-    def findSubService(services: Seq[Service]): Option[Service] = {
+    def findSubService(services: Seq[Service[A]]): Option[Service[A]] = {
       val sortedServices = services
         .filter(_.enabled)
         .sortWith(
@@ -65,8 +65,8 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, stats
             else if (a.root.isEmpty && a.matchingHeaders.nonEmpty) true
             else a.root.isDefined
         )
-      var found: Option[Service] = None
-      var index                  = 0
+      var found: Option[Service[A]] = None
+      var index                     = 0
       while (found.isEmpty && index < sortedServices.size) {
         val s = sortedServices(index)
         index = index + 1
@@ -105,7 +105,7 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, stats
     }
   }
 
-  def extractCallRestriction(service: Service, path: Uri.Path): CallRestriction = {
+  def extractCallRestriction(service: Service[A], path: Uri.Path): CallRestriction = {
     val uri                 = path.toString()
     val privatePatternMatch = service.privatePatterns.exists(p => RegexPool(p).matches(uri))
     val publicPatternMatch  = service.publicPatterns.exists(p => RegexPool(p).matches(uri))
@@ -280,20 +280,22 @@ class HttpProxy(config: ProxyConfig, store: Store, modules: ModulesConfig, stats
     fu.andThen { case _ => startCtx.close() }
   }
 
-  def start(): Stoppable[HttpProxy] = {
+  def start(): Stoppable[HttpProxy[A]] = {
     logger.info(s"Listening for http call on http://${config.http.listenOn}:${config.http.httpPort}")
     http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpPort).andThen {
       case Success(sb) => boundHttp.trySuccess(sb)
-      case Failure(e) => boundHttp.tryFailure(e)
+      case Failure(e)  => boundHttp.tryFailure(e)
     }
     config.http.certPath.foreach { path =>
       val httpsContext =
         HttpsSupport.context(path, config.http.keyPath, config.http.certPass.get, config.http.keyStoreType)
       logger.info(s"Listening for https calls on https://${config.http.listenOn}:${config.http.httpsPort}")
-      http.bindAndHandleAsync(handler, config.http.listenOn, config.http.httpsPort, connectionContext = httpsContext).andThen {
-        case Success(sb) => boundHttps.trySuccess(sb)
-        case Failure(e) => boundHttps.tryFailure(e)
-      }
+      http
+        .bindAndHandleAsync(handler, config.http.listenOn, config.http.httpsPort, connectionContext = httpsContext)
+        .andThen {
+          case Success(sb) => boundHttps.trySuccess(sb)
+          case Failure(e)  => boundHttps.tryFailure(e)
+        }
     }
     this
   }
