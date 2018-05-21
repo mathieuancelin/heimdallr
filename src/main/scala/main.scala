@@ -99,7 +99,7 @@ object Main {
             .stopOnShutdown()
       )
       .orElse(args.find(_.startsWith("--proxy.config=")).map(_.replace("--proxy.config=", "")).map { path =>
-        Proxy.fromConfigPath[NoExtension, NoExtension](path, DefaultModules, NoExtension) match {
+        Proxy.fromConfigPath[NoExtension, NoExtension](path, DefaultModules) match {
           case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
           case Right(proxy) => {
             val configFile   = new File(path)
@@ -118,7 +118,7 @@ object Main {
       })
       .getOrElse {
         val path = "./heimdallr.conf"
-        Proxy.fromConfigPath[NoExtension, NoExtension](path, DefaultModules, NoExtension) match {
+        Proxy.fromConfigPath[NoExtension, NoExtension](path, DefaultModules) match {
           case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
           case Right(proxy) => {
             val configFile   = new File(path)

@@ -143,7 +143,7 @@ object Proxy {
       val either = io.circe.parser.parse(jsonConf) match {
         case Left(e) => Left(ConfigError(e.message))
         case Right(json) =>
-          val decoders = new Decoders[A, K](extensions)
+          val decoders = new Decoders[A, K](modules.extensions)
           decoders.ProxyConfigDecoder.decodeJson(json) match {
             case Right(config) => Right(new Proxy(config, modules))
             case Left(e)       => Left(ConfigError(e.message))
