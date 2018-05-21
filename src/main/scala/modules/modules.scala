@@ -33,30 +33,6 @@ object NoExtension extends Extensions[NoExtension, NoExtension] {
   override def apiKeyExtensionDecoder: Decoder[NoExtension] = NoExtensionDecoder
 }
 
-//case class DefaultModulesConfig[A, K](modules: Seq[_ <: Module[A, K]] = Seq.empty) extends ModulesConfig[A, K] {
-//  lazy val PreconditionModules: Seq[PreconditionModule[A, K]] = modules.collect {
-//    case m: PreconditionModule[A, K] => m
-//  }
-//  lazy val ServiceAccessModules: Seq[ServiceAccessModule[A, K]] = modules.collect {
-//    case m: ServiceAccessModule[A, K] => m
-//  }
-//  lazy val HeadersInTransformationModules: Seq[HeadersInTransformationModule[A, K]] = modules.collect {
-//    case m: HeadersInTransformationModule[A, K] => m
-//  }
-//  lazy val HeadersOutTransformationModules: Seq[HeadersOutTransformationModule[A, K]] = modules.collect {
-//    case m: HeadersOutTransformationModule[A, K] => m
-//  }
-//  lazy val ErrorRendererModule: ErrorRendererModule[A, K] = modules.collect {
-//    case m: ErrorRendererModule[A, K] => m
-//  } last
-//  lazy val TargetSetChooserModule: TargetSetChooserModule[A, K] = modules.collect {
-//    case m: TargetSetChooserModule[A, K] => m
-//  } last
-//  lazy val ServiceFinderModule: ServiceFinderModule[A, K] = modules.collect {
-//    case m: ServiceFinderModule[A, K] => m
-//  } last
-//}
-
 object DefaultModules extends Modules[NoExtension, NoExtension] {
   val modules: ModulesConfig[NoExtension, NoExtension] = new ModulesConfig[NoExtension, NoExtension] {
     override def PreconditionModules: Seq[PreconditionModule[NoExtension, NoExtension]] =
@@ -70,7 +46,8 @@ object DefaultModules extends Modules[NoExtension, NoExtension] {
     override def ErrorRendererModule: ErrorRendererModule[NoExtension, NoExtension] = new DefaultErrorRendererModule()
     override def TargetSetChooserModule: TargetSetChooserModule[NoExtension, NoExtension] =
       new DefaultTargetSetChooserModule()
-    override def ServiceFinderModule: ServiceFinderModule[NoExtension, NoExtension] = new DefaultServiceFinderModule()
+    override def ServiceFinderModule: ServiceFinderModule[NoExtension, NoExtension]   = new DefaultServiceFinderModule()
+    override def BeforeAfterModules: Seq[BeforeAfterModule[NoExtension, NoExtension]] = Seq.empty
   }
   val extensions: Extensions[NoExtension, NoExtension] = NoExtension
 }

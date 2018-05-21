@@ -25,6 +25,7 @@ trait Modules[A, B] {
 }
 
 trait ModulesConfig[A, K] {
+  def BeforeAfterModules: Seq[BeforeAfterModule[A, K]]
   def PreconditionModules: Seq[PreconditionModule[A, K]]
   def ServiceAccessModules: Seq[ServiceAccessModule[A, K]]
   def HeadersInTransformationModules: Seq[HeadersInTransformationModule[A, K]]
@@ -54,6 +55,26 @@ object PreconditionModule {
     }
     Right(())
   }
+}
+
+trait BeforeAfterModule[A, K] extends Modules[A, K] {
+  def beforeRequest(ctx: ReqContext): Unit
+  def afterRequestSuccess(ctx: ReqContext): Unit
+  def afterRequestWebSocketSuccess(ctx: ReqContext): Unit
+  def afterRequestError(ctx: ReqContext): Unit
+  def afterRequestEnd(ctx: ReqContext): Unit
+}
+object BeforeAfterModule {
+  def beforeRequest[A, K](modules: Seq[BeforeAfterModule[A, K]], ctx: ReqContext): Unit =
+    modules.foreach(m => m.beforeRequest(ctx))
+  def afterRequestSuccess[A, K](modules: Seq[BeforeAfterModule[A, K]], ctx: ReqContext): Unit =
+    modules.foreach(m => m.afterRequestSuccess(ctx))
+  def afterRequestWebSocketSuccess[A, K](modules: Seq[BeforeAfterModule[A, K]], ctx: ReqContext): Unit =
+    modules.foreach(m => m.afterRequestWebSocketSuccess(ctx))
+  def afterRequestError[A, K](modules: Seq[BeforeAfterModule[A, K]], ctx: ReqContext): Unit =
+    modules.foreach(m => m.afterRequestError(ctx))
+  def afterRequestEnd[A, K](modules: Seq[BeforeAfterModule[A, K]], ctx: ReqContext): Unit =
+    modules.foreach(m => m.afterRequestEnd(ctx))
 }
 
 trait ServiceFinderModule[A, K] extends Module[A, K] {

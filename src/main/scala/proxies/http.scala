@@ -68,7 +68,10 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
     val startCtx  = statsd.timeCtx("proxy-request")
     val requestId = UUID.randomUUID().toString
     val ctx       = ReqContext(requestId, TypedMap.empty, request)
-    val host      = extractHost(request)
+
+    BeforeAfterModule.beforeRequest(modules.modules.BeforeAfterModules, ctx)
+
+    val host = extractHost(request)
     val fu = ServiceFinderModule.findService(modules.modules.ServiceFinderModule,
                                              store,
                                              ctx,
@@ -132,6 +135,7 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
                   )
                   FastFuture.successful(upgrade.handleMessages(flow)).andThen {
                     case Success(resp) =>
+                      BeforeAfterModule.afterRequestWebSocketSuccess(modules.modules.BeforeAfterModules, ctx)
                       if (logger.isInfoEnabled) {
                         logger.info(
                           s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
@@ -158,6 +162,7 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
                     )
                   } andThen {
                     case Success(resp) =>
+                      BeforeAfterModule.afterRequestSuccess(modules.modules.BeforeAfterModules, ctx)
                       if (logger.isInfoEnabled) {
                         logger.info(
                           s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
@@ -171,6 +176,7 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
             .recover {
               case _: akka.pattern.CircuitBreakerOpenException =>
                 request.discardEntityBytes()
+                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
                 ErrorRendererModule.render(modules.modules.ErrorRendererModule,
                                            ctx,
                                            502,
@@ -178,6 +184,7 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
                                            Some(service))
               case _: TimeoutException =>
                 request.discardEntityBytes()
+                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
                 ErrorRendererModule.render(modules.modules.ErrorRendererModule,
                                            ctx,
                                            504,
@@ -185,17 +192,21 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
                                            Some(service))
               case e =>
                 request.discardEntityBytes()
+                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
                 ErrorRendererModule.render(modules.modules.ErrorRendererModule, ctx, 502, e.getMessage, Some(service))
             }
         }
 
         PreconditionModule.validatePreconditions(modules.modules.PreconditionModules, ctx, service) match {
-          case Left(resp) => FastFuture.successful(resp)
+          case Left(resp) =>
+            BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
+            FastFuture.successful(resp)
           case Right(_) =>
             (callRestriction, withApiKeyOrNot) match {
               case (PublicCall, waon) => makeTheCall(waon)
               case (PrivateCall, NoApiKey) =>
                 request.discardEntityBytes()
+                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
                 FastFuture.successful(
                   ErrorRendererModule
                     .render(modules.modules.ErrorRendererModule, ctx, 401, "No ApiKey provided", Some(service))
@@ -203,12 +214,14 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
               case (PrivateCall, waon @ WithApiKey(_)) => makeTheCall(waon)
               case (PrivateCall, BadApiKey) =>
                 request.discardEntityBytes()
+                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
                 FastFuture.successful(
                   ErrorRendererModule
                     .render(modules.modules.ErrorRendererModule, ctx, 401, "Bad ApiKey provided", Some(service))
                 )
               case _ =>
                 request.discardEntityBytes()
+                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
                 FastFuture.successful(
                   ErrorRendererModule
                     .render(modules.modules.ErrorRendererModule, ctx, 401, "No ApiKey provided", Some(service))
@@ -218,11 +231,16 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
       }
       case None =>
         request.discardEntityBytes()
+        BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
         FastFuture.successful(
           ErrorRendererModule.render(modules.modules.ErrorRendererModule, ctx, 404, "No ApiKey provided", None)
         )
     }
-    fu.andThen { case _ => startCtx.close() }
+    fu.andThen {
+      case _ =>
+        startCtx.close()
+        BeforeAfterModule.afterRequestEnd(modules.modules.BeforeAfterModules, ctx)
+    }
   }
 
   def start(): Stoppable[HttpProxy[A, K]] = {
