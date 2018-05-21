@@ -26,12 +26,11 @@ Heimdallr is designed to be embedded and enhanced through pluggable modules
 
 ```scala
 import io.heimdallr.Proxy
-import io.heimdallr.modules._
 
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    Proxy.fromConfigPath("./heimdallr.conf", DefaultModules) match {
+    Proxy.defaultFromConfigPath("./heimdallr.conf") match {
       case Left(e) => println(s"error while parsing config. $e")
       case Right(proxy) => proxy.stopOnShutdown()
     }
@@ -42,13 +41,12 @@ object MyOwnProxy {
 
 ```scala
 import io.heimdallr.Proxy
-import io.heimdallr.modules._
 import java.io.File
 
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    Proxy.fromConfigPath("https://foo.bar/heimdallr.conf") match {
+    Proxy.defaultFromConfigPath("https://foo.bar/heimdallr.conf") match {
       case Left(e) => println(s"error while parsing config. $e")
       case Right(proxy) => proxy.stopOnShutdown()
     }
@@ -59,13 +57,12 @@ object MyOwnProxy {
 
 ```scala
 import io.heimdallr.Proxy
-import io.heimdallr.modules._
 import java.io.File
 
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    Proxy.fromConfigFile(new File("./heimdallr.conf"), DefaultModules) match {
+    Proxy.defaultFromConfigFile(new File("./heimdallr.conf")) match {
       case Left(e) => println(s"error while parsing config. $e")
       case Right(proxy) => proxy.stopOnShutdown()
     }
@@ -77,12 +74,11 @@ object MyOwnProxy {
 ```scala
 import io.heimdallr.Proxy
 import io.heimdallr.models._
-import io.heimdallr.modules._
 
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    val proxy = Proxy.withConfig(ProxyConfig(
+    val proxy = Proxy.defaultWithConfig(ProxyConfig(
       http = HttpConfig(
         httpPort = 8080,
         httpsPort = 8443,
@@ -111,7 +107,7 @@ object MyOwnProxy {
           publicPatterns = Set("/*")
         )
       )
-    ), DefaultModules).stopOnShutdown()
+    )).stopOnShutdown()
   }
 }
 ```
@@ -119,61 +115,6 @@ object MyOwnProxy {
 ## Modules
 
 Heimdallr provides extension points to add new feature on top of basic http proxies
-
-```scala
-def withConfig(config: ProxyConfig[ServiceExt, ApiKeyExt], modules: Modules[ServiceExt, ApiKeyExt]): Proxy[ServiceExt, ApiKeyExt]
-def fromConfigPath(path: String, modules: Modules[ServiceExt, ApiKeyExt]): Either[ConfigError, Proxy[ServiceExt, ApiKeyExt]]
-def fromConfigFile(file: File, modules: Modules[ServiceExt, ApiKeyExt]): Either[ConfigError, Proxy[ServiceExt, ApiKeyExt]]
-```
-
-modules includes the following possibilities 
-
-```scala
-
-// can handle construction mode, maintenance mode
-trait PreconditionModule extends Module {
-  def validatePreconditions(reqId: String, service: Service, request: HttpRequest): Either[HttpResponse, Unit]
-}
-
-// can handle pass by api, pass by auth0, throttling, gobal throtthling, etc ...
-trait ServiceAccessModule extends Module {
-  def access(reqId: String, service: Service, request: HttpRequest): WithApiKeyOrNot
-}
-
-// can handle headers additions, like JWT header, request id, API quotas, etc ... to target
-trait HeadersInTransformationModule extends Module {
-  def transform(reqId: String,
-                host: String,
-                service: Service,
-                target: Target,
-                request: HttpRequest,
-                waon: WithApiKeyOrNot,
-                headers: List[HttpHeader]): List[HttpHeader]
-}
-
-// can handle headers additions, like, API quotas, etc ... on target responses
-trait HeadersOutTransformationModule extends Module {
-  def transform(reqId: String,
-                host: String,
-                service: Service,
-                target: Target,
-                request: HttpRequest,
-                waon: WithApiKeyOrNot,
-                proxyLatency: Long,
-                targetLatency: Long,
-                headers: List[HttpHeader]): List[HttpHeader]
-}
-
-// can handle custom template errors
-trait ErrorRendererModule extends Module {
-  def render(reqId: String, status: Int, message: String, service: Option[Service], request: HttpRequest): HttpResponse
-}
-
-// can handle canary mode
-trait TargetSetChooserModule extends Module {
-  def choose(reqId: String, service: Service, request: HttpRequest): Seq[Target]
-}
-````
 
 ## Build it
 
@@ -218,8 +159,6 @@ docker run -d -p "8083:80" emilevauge/whoami
 * https://github.com/akka/akka-http/issues/530
 
 ## Features
-
-- [ ] use future for modules ?
 
 - [ ] built-in kafka support as commands input
 - [ ] built-in kafka support as logs output
