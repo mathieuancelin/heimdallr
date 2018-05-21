@@ -49,6 +49,7 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
       body mustEqual expectedBody
 
       heimdallr.stop()
+      targetServer.stop()
 
     }
 
@@ -112,6 +113,7 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
         .await()
 
       heimdallr.stop()
+      targetServer.stop()
 
     }
 
@@ -156,6 +158,7 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
       } mustBe true
 
       heimdallr.stop()
+      targetServer.stop()
 
     }
 
@@ -209,6 +212,7 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
       body mustEqual expectedBody
 
       heimdallr.stop()
+      targetServer.stop()
 
     }
 
@@ -268,6 +272,7 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
       targetCounter.get() mustEqual 2
 
       heimdallr.stop()
+      targetServer.stop()
 
     }
 
@@ -315,6 +320,7 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
         .await()
 
       heimdallr.stop()
+      targetServer.stop()
 
     }
 
@@ -388,6 +394,8 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
         .await()
 
       heimdallr.stop()
+      targetServer1.stop()
+      targetServer2.stop()
 
     }
 
@@ -462,6 +470,9 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
       targetCounter3.get() mustEqual 1
 
       heimdallr.stop()
+      targetServer1.stop()
+      targetServer2.stop()
+      targetServer3.stop()
 
     }
 
@@ -544,6 +555,9 @@ class HeimdallrSpec extends WordSpec with MustMatchers with HeimdallrTestCaseHel
       targetCounter3.get() mustEqual 1
 
       heimdallr.stop()
+      targetServer1.stop()
+      targetServer2.stop()
+      targetServer3.stop()
 
     }
   }

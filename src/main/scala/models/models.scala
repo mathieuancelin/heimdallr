@@ -27,26 +27,26 @@ case class ClientConfig(retry: Int = 3,
                         resetTimeout: FiniteDuration = 10.seconds)
 
 case class ApiKey[K](clientId: String,
-                  clientSecret: String,
-                  name: String,
-                  enabled: Boolean,
-                  metadata: Map[String, String] = Map.empty,
+                     clientSecret: String,
+                     name: String,
+                     enabled: Boolean,
+                     metadata: Map[String, String] = Map.empty,
                      extension: Option[K] = None)
 
 case class Service[A, K](id: String,
-                      domain: String,
-                      enabled: Boolean = true,
-                      targets: Seq[Target] = Seq.empty,
-                      apiKeys: Seq[ApiKey[K]] = Seq.empty,
-                      clientConfig: ClientConfig = ClientConfig(),
-                      additionalHeaders: Map[String, String] = Map.empty,
-                      matchingHeaders: Map[String, String] = Map.empty,
-                      targetRoot: String = "",
-                      root: Option[String] = None,
-                      publicPatterns: Set[String] = Set.empty,
-                      privatePatterns: Set[String] = Set.empty,
-                      metadata: Map[String, String] = Map.empty,
-                      extension: Option[A] = None)
+                         domain: String,
+                         enabled: Boolean = true,
+                         targets: Seq[Target] = Seq.empty,
+                         apiKeys: Seq[ApiKey[K]] = Seq.empty,
+                         clientConfig: ClientConfig = ClientConfig(),
+                         additionalHeaders: Map[String, String] = Map.empty,
+                         matchingHeaders: Map[String, String] = Map.empty,
+                         targetRoot: String = "",
+                         root: Option[String] = None,
+                         publicPatterns: Set[String] = Set.empty,
+                         privatePatterns: Set[String] = Set.empty,
+                         metadata: Map[String, String] = Map.empty,
+                         extension: Option[A] = None)
 
 case class OtoroshiStateConfig(url: String, headers: Map[String, String], pollEvery: FiniteDuration = 10.seconds)
 case class LocalStateConfig(path: String, writeEvery: FiniteDuration = 10.seconds)
@@ -130,7 +130,7 @@ case class ProxyConfig[A, K](
 class Decoders[A, K](extensions: Extensions[A, K]) {
 
   implicit val serviceExtensionDecoder = extensions.serviceExtensionDecoder
-  implicit val apiKeyExtensionDecoder = extensions.apiKeyExtensionDecoder
+  implicit val apiKeyExtensionDecoder  = extensions.apiKeyExtensionDecoder
 
   implicit val FiniteDurationDecoder: Decoder[FiniteDuration] = new Decoder[FiniteDuration] {
     override def apply(c: HCursor): Result[FiniteDuration] =
@@ -146,19 +146,19 @@ class Decoders[A, K](extensions: Extensions[A, K]) {
   implicit val StateConfigDecoder: Decoder[StateConfig]                 = deriveDecoder[StateConfig]
   implicit val TargetDecoder: Decoder[Target]                           = deriveDecoder[Target]
   implicit val ClientConfigDecoder: Decoder[ClientConfig]               = deriveDecoder[ClientConfig]
-  implicit val ApiKeyDecoder: Decoder[ApiKey[K]]                           = deriveDecoder[ApiKey[K]]
-  implicit val ServiceDecoder: Decoder[Service[A, K]]                      = deriveDecoder[Service[A, K]]
-  implicit val SeqOfServiceDecoder: Decoder[Seq[Service[A, K]]]            = Decoder.decodeSeq(ServiceDecoder)
+  implicit val ApiKeyDecoder: Decoder[ApiKey[K]]                        = deriveDecoder[ApiKey[K]]
+  implicit val ServiceDecoder: Decoder[Service[A, K]]                   = deriveDecoder[Service[A, K]]
+  implicit val SeqOfServiceDecoder: Decoder[Seq[Service[A, K]]]         = Decoder.decodeSeq(ServiceDecoder)
   implicit val HttpConfigDecoder: Decoder[HttpConfig]                   = deriveDecoder[HttpConfig]
   implicit val ApiConfigDecoder: Decoder[ApiConfig]                     = deriveDecoder[ApiConfig]
   implicit val LoggersConfigDecoder: Decoder[LoggersConfig]             = deriveDecoder[LoggersConfig]
-  implicit val ProxyConfigDecoder: Decoder[ProxyConfig[A, K]]              = deriveDecoder[ProxyConfig[A, K]]
+  implicit val ProxyConfigDecoder: Decoder[ProxyConfig[A, K]]           = deriveDecoder[ProxyConfig[A, K]]
 }
 
 class Encoders[A, K](extensions: Extensions[A, K]) {
 
   implicit val serviceExtensionEncoder = extensions.serviceExtensionEncoder
-  implicit val apiKeyExtensionEncoder = extensions.apiKeyExtensionEncoder
+  implicit val apiKeyExtensionEncoder  = extensions.apiKeyExtensionEncoder
 
   implicit val FiniteDurationEncoder: Encoder[FiniteDuration] = new Encoder[FiniteDuration] {
     override def apply(a: FiniteDuration): Json = Json.fromLong(a.toMillis)
@@ -173,18 +173,18 @@ class Encoders[A, K](extensions: Extensions[A, K]) {
   implicit val StateConfigEncoder: Encoder[StateConfig]                 = deriveEncoder[StateConfig]
   implicit val TargetEncoder: Encoder[Target]                           = deriveEncoder[Target]
   implicit val ClientConfigEncoder: Encoder[ClientConfig]               = deriveEncoder[ClientConfig]
-  implicit val ApiKeyEncoder: Encoder[ApiKey[K]]                           = deriveEncoder[ApiKey[K]]
-  implicit val ServiceEncoder: Encoder[Service[A, K]]                      = deriveEncoder[Service[A, K]]
-  implicit val SeqOfServiceEncoder: Encoder[Seq[Service[A, K]]]            = Encoder.encodeSeq(ServiceEncoder)
+  implicit val ApiKeyEncoder: Encoder[ApiKey[K]]                        = deriveEncoder[ApiKey[K]]
+  implicit val ServiceEncoder: Encoder[Service[A, K]]                   = deriveEncoder[Service[A, K]]
+  implicit val SeqOfServiceEncoder: Encoder[Seq[Service[A, K]]]         = Encoder.encodeSeq(ServiceEncoder)
   implicit val HttpConfigEncoder: Encoder[HttpConfig]                   = deriveEncoder[HttpConfig]
   implicit val ApiConfigEncoder: Encoder[ApiConfig]                     = deriveEncoder[ApiConfig]
   implicit val LoggersConfigEncoder: Encoder[LoggersConfig]             = deriveEncoder[LoggersConfig]
-  implicit val ProxyConfigEncoder: Encoder[ProxyConfig[A, K]]              = deriveEncoder[ProxyConfig[A, K]]
+  implicit val ProxyConfigEncoder: Encoder[ProxyConfig[A, K]]           = deriveEncoder[ProxyConfig[A, K]]
 }
 
 sealed trait WithApiKeyOrNot
-case object NoApiKey                  extends WithApiKeyOrNot
-case object BadApiKey                 extends WithApiKeyOrNot
+case object NoApiKey                        extends WithApiKeyOrNot
+case object BadApiKey                       extends WithApiKeyOrNot
 case class WithApiKey[K](apiKey: ApiKey[K]) extends WithApiKeyOrNot
 
 sealed trait CallRestriction
@@ -231,7 +231,8 @@ case class GetMetricsCommand[A, K](command: String) extends Command[A, K] {
   }
 }
 
-case class LoadStateCommand[A, K](command: String, serviceId: String, services: Seq[Service[A, K]]) extends Command[A, K] {
+case class LoadStateCommand[A, K](command: String, serviceId: String, services: Seq[Service[A, K]])
+    extends Command[A, K] {
   def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = services
 }
 
@@ -239,7 +240,8 @@ case class AddServiceCommand[A, K](command: String, service: Service[A, K]) exte
   def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = state :+ service
 }
 
-case class UpdateServiceCommand[A, K](command: String, serviceId: String, updatedService: Service[A, K]) extends Command[A, K] {
+case class UpdateServiceCommand[A, K](command: String, serviceId: String, updatedService: Service[A, K])
+    extends Command[A, K] {
   def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
     state
       .find(_.id == serviceId)
@@ -401,7 +403,8 @@ case class ResetApiKeyCommand[A, K](command: String, serviceId: String, clientId
   }
 }
 
-case class UpdateClientConfigCommand[A, K](command: String, serviceId: String, config: ClientConfig) extends Command[A, K] {
+case class UpdateClientConfigCommand[A, K](command: String, serviceId: String, config: ClientConfig)
+    extends Command[A, K] {
   def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
     state
       .find(_.id == serviceId)
@@ -559,7 +562,8 @@ case class AddPrivatePatternCommand[A, K](command: String, serviceId: String, pa
   }
 }
 
-case class RemovePrivatePatternCommand[A, K](command: String, serviceId: String, pattern: String) extends Command[A, K] {
+case class RemovePrivatePatternCommand[A, K](command: String, serviceId: String, pattern: String)
+    extends Command[A, K] {
   def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
     state
       .find(_.id == serviceId)
@@ -631,16 +635,20 @@ class Commands[A, K](decoders: Decoders[A, K]) {
     deriveDecoder[RemoveAdditionalHeaderCommand[A, K]]
   val UpdateAdditionalHeaderCommandDecoder: Decoder[UpdateAdditionalHeaderCommand[A, K]] =
     deriveDecoder[UpdateAdditionalHeaderCommand[A, K]]
-  val AddMatchingHeaderCommandDecoder: Decoder[AddMatchingHeaderCommand[A, K]] = deriveDecoder[AddMatchingHeaderCommand[A, K]]
+  val AddMatchingHeaderCommandDecoder: Decoder[AddMatchingHeaderCommand[A, K]] =
+    deriveDecoder[AddMatchingHeaderCommand[A, K]]
   val RemoveMatchingHeaderCommandDecoder: Decoder[RemoveMatchingHeaderCommand[A, K]] =
     deriveDecoder[RemoveMatchingHeaderCommand[A, K]]
   val UpdateMatchingHeaderCommandDecoder: Decoder[UpdateMatchingHeaderCommand[A, K]] =
     deriveDecoder[UpdateMatchingHeaderCommand[A, K]]
-  val UpdateTargetRootCommandDecoder: Decoder[UpdateTargetRootCommand[A, K]] = deriveDecoder[UpdateTargetRootCommand[A, K]]
-  val AddPublicPatternCommandDecoder: Decoder[AddPublicPatternCommand[A, K]] = deriveDecoder[AddPublicPatternCommand[A, K]]
+  val UpdateTargetRootCommandDecoder: Decoder[UpdateTargetRootCommand[A, K]] =
+    deriveDecoder[UpdateTargetRootCommand[A, K]]
+  val AddPublicPatternCommandDecoder: Decoder[AddPublicPatternCommand[A, K]] =
+    deriveDecoder[AddPublicPatternCommand[A, K]]
   val RemovePublicPatternCommandDecoder: Decoder[RemovePublicPatternCommand[A, K]] =
     deriveDecoder[RemovePublicPatternCommand[A, K]]
-  val AddPrivatePatternCommandDecoder: Decoder[AddPrivatePatternCommand[A, K]] = deriveDecoder[AddPrivatePatternCommand[A, K]]
+  val AddPrivatePatternCommandDecoder: Decoder[AddPrivatePatternCommand[A, K]] =
+    deriveDecoder[AddPrivatePatternCommand[A, K]]
   val RemovePrivatePatternCommandDecoder: Decoder[RemovePrivatePatternCommand[A, K]] =
     deriveDecoder[RemovePrivatePatternCommand[A, K]]
   val UpdateRootCommandDecoder: Decoder[UpdateRootCommand[A, K]] = deriveDecoder[UpdateRootCommand[A, K]]

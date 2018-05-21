@@ -29,10 +29,10 @@ trait Store[A, K] extends Startable[Store[A, K]] with Stoppable[Store[A, K]] {
 }
 
 class AtomicStore[A, K](initialState: Map[String, Seq[Service[A, K]]] = Map.empty[String, Seq[Service[A, K]]],
-                     stateConfig: Option[StateConfig],
-                     statsd: Statsd[A, K],
-                     encoders: Encoders[A, K],
-                     decoders: Decoders[A, K])
+                        stateConfig: Option[StateConfig],
+                        statsd: Statsd[A, K],
+                        encoders: Encoders[A, K],
+                        decoders: Decoders[A, K])
     extends Store[A, K]
     with Startable[Store[A, K]]
     with Stoppable[Store[A, K]] {

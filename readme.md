@@ -26,11 +26,12 @@ Heimdallr is designed to be embedded and enhanced through pluggable modules
 
 ```scala
 import io.heimdallr.Proxy
+import io.heimdallr.modules._
 
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    Proxy.fromConfigPath("./heimdallr.conf") match {
+    Proxy.fromConfigPath("./heimdallr.conf", DefaultModules) match {
       case Left(e) => println(s"error while parsing config. $e")
       case Right(proxy) => proxy.stopOnShutdown()
     }
@@ -41,6 +42,7 @@ object MyOwnProxy {
 
 ```scala
 import io.heimdallr.Proxy
+import io.heimdallr.modules._
 import java.io.File
 
 object MyOwnProxy {
@@ -57,11 +59,13 @@ object MyOwnProxy {
 
 ```scala
 import io.heimdallr.Proxy
+import io.heimdallr.modules._
+import java.io.File
 
 object MyOwnProxy {
 
   def main(args: Array[String]): Unit = {
-    Proxy.fromConfigFile(new File("./heimdallr.conf")) match {
+    Proxy.fromConfigFile(new File("./heimdallr.conf"), DefaultModules) match {
       case Left(e) => println(s"error while parsing config. $e")
       case Right(proxy) => proxy.stopOnShutdown()
     }
@@ -73,6 +77,7 @@ object MyOwnProxy {
 ```scala
 import io.heimdallr.Proxy
 import io.heimdallr.models._
+import io.heimdallr.modules._
 
 object MyOwnProxy {
 
@@ -106,7 +111,7 @@ object MyOwnProxy {
           publicPatterns = Set("/*")
         )
       )
-    )).stopOnShutdown()
+    ), DefaultModules).stopOnShutdown()
   }
 }
 ```
@@ -116,9 +121,9 @@ object MyOwnProxy {
 Heimdallr provides extension points to add new feature on top of basic http proxies
 
 ```scala
-def withConfig(config: ProxyConfig, modules: ModulesConfig = Modules.defaultModules): Proxy
-def fromConfigPath(path: String, modules: ModulesConfig = Modules.defaultModules): Either[ConfigError, Proxy]
-def fromConfigFile(file: File, modules: ModulesConfig = Modules.defaultModules): Either[ConfigError, Proxy]
+def withConfig(config: ProxyConfig[ServiceExt, ApiKeyExt], modules: Modules[ServiceExt, ApiKeyExt]): Proxy[ServiceExt, ApiKeyExt]
+def fromConfigPath(path: String, modules: Modules[ServiceExt, ApiKeyExt]): Either[ConfigError, Proxy[ServiceExt, ApiKeyExt]]
+def fromConfigFile(file: File, modules: Modules[ServiceExt, ApiKeyExt]): Either[ConfigError, Proxy[ServiceExt, ApiKeyExt]]
 ```
 
 modules includes the following possibilities 
@@ -170,17 +175,6 @@ trait TargetSetChooserModule extends Module {
 }
 ````
 
-`Modules.defaultModules` provides the following features
-
-```scala
-DefaultPreconditionModule // return error if service is not enabled
-DefaultServiceAccessModule // handle access by ApiKey using various headers
-DefaultHeadersInTransformationModule // add new headers on request like X-Request-Id, X-Fowarded-Host, X-Fowarded-Scheme and custom headers
-DefaultHeadersOutTransformationModule // add new headers on response like X-Proxy-Latency, X-Target-Latency
-DefaultErrorRendererModule // return errors as json responses
-DefaultTargetSetChooserModule // use service targets for loadbalancing
-```
-
 ## Build it
 
 ```sh
@@ -224,6 +218,10 @@ docker run -d -p "8083:80" emilevauge/whoami
 * https://github.com/akka/akka-http/issues/530
 
 ## Features
+
+- [ ] add module for service finding with default mechanism as module
+- [ ] add module for before/after request
+- [ ] use future for modules ?
 
 - [ ] built-in kafka support as commands input
 - [ ] built-in kafka support as logs output

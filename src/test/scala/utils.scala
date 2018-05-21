@@ -10,7 +10,7 @@ import akka.http.scaladsl.{Http, HttpExt}
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import io.heimdallr.models._
-import io.heimdallr.modules.{Modules, NoExtension}
+import io.heimdallr.modules.{DefaultModules, Modules, NoExtension}
 import io.heimdallr.util.HttpResponses
 
 import scala.concurrent.duration._
@@ -63,12 +63,14 @@ trait HeimdallrTestCaseHelper {
       }
   }
 
-  def HeimdallrInstance(httpPort: Int, services: Seq[Service[NoExtension, NoExtension]]): io.heimdallr.Proxy[NoExtension, NoExtension] = {
+  def HeimdallrInstance(
+      httpPort: Int,
+      services: Seq[Service[NoExtension, NoExtension]]
+  ): io.heimdallr.Proxy[NoExtension, NoExtension] = {
     io.heimdallr.Proxy
       .withConfig(
         ProxyConfig(api = ApiConfig(enabled = false), http = HttpConfig(httpPort = httpPort), services = services),
-        Modules.defaultModules,
-        NoExtension
+        DefaultModules
       )
       .startAndWait()
   }
@@ -115,6 +117,12 @@ trait HeimdallrTestCaseHelper {
     def await(): TargetService = {
       Await.result(bound, 60.seconds)
       this
+    }
+
+    def stop(): Unit = {
+      Await.result(bound, 60.seconds).unbind()
+      Await.result(http.shutdownAllConnectionPools(), 60.seconds)
+      Await.result(system.terminate(), 60.seconds)
     }
   }
 

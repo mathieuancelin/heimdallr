@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.{Future, Promise, TimeoutException}
 import scala.util.{Failure, Success}
 
-class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: ModulesConfig[A, K], statsd: Statsd[A, K])
+class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Modules[A, K], statsd: Statsd[A, K])
     extends Startable[HttpProxy[A, K]]
     with Stoppable[HttpProxy[A, K]] {
 
@@ -66,7 +66,7 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
             else a.root.isDefined
         )
       var found: Option[Service[A, K]] = None
-      var index                     = 0
+      var index                        = 0
       while (found.isEmpty && index < sortedServices.size) {
         val s = sortedServices(index)
         index = index + 1
@@ -120,12 +120,14 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
     val start     = System.currentTimeMillis()
     val startCtx  = statsd.timeCtx("proxy-request")
     val requestId = UUID.randomUUID().toString
+    val ctx       = ReqContext(requestId, TypedMap.empty, request)
     val host      = extractHost(request)
     val fu = findService(host, request.uri.path, request.headers.groupBy(_.name()).mapValues(_.last)) match {
       case Some(service) => {
-        val rawSeq          = TargetSetChooserModule.choose(modules.TargetSetChooserModules, requestId, service, request)
-        val seq             = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
-        val withApiKeyOrNot = ServiceAccessModule.access(modules.ServiceAccessModules, requestId, service, request)
+        val rawSeq = TargetSetChooserModule.choose(modules.modules.TargetSetChooserModules, ctx, service)
+        val seq    = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
+        val withApiKeyOrNot =
+          ServiceAccessModule.access(modules.modules.ServiceAccessModules, ctx, service)
         val callRestriction = extractCallRestriction(service, request.uri.path)
 
         @inline
@@ -146,12 +148,11 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
               )
               val headersWithoutHost = request.headers.filterNot(t => t.name() == "Host")
               val headersIn: Seq[HttpHeader] = headersWithoutHost ++
-              HeadersInTransformationModule.transform(modules.HeadersInTransformationModules,
-                                                      requestId,
+              HeadersInTransformationModule.transform(modules.modules.HeadersInTransformationModules,
+                                                      ctx,
                                                       host,
                                                       service,
                                                       target,
-                                                      request,
                                                       waon,
                                                       headersWithoutHost.toList) :+
               Host(target.host)
@@ -192,12 +193,11 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
                   circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).map { resp =>
                     resp.copy(
                       headers = HeadersOutTransformationModule.transform(
-                        modules.HeadersOutTransformationModules,
-                        requestId,
+                        modules.modules.HeadersOutTransformationModules,
+                        ctx,
                         host,
                         service,
                         target,
-                        request,
                         waon,
                         System.currentTimeMillis() - start,
                         System.currentTimeMillis() - callStart,
@@ -219,32 +219,25 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
             .recover {
               case _: akka.pattern.CircuitBreakerOpenException =>
                 request.discardEntityBytes()
-                ErrorRendererModule.render(modules.ErrorRendererModules,
-                                           requestId,
+                ErrorRendererModule.render(modules.modules.ErrorRendererModules,
+                                           ctx,
                                            502,
                                            "Circuit breaker is open",
-                                           Some(service),
-                                           request)
+                                           Some(service))
               case _: TimeoutException =>
                 request.discardEntityBytes()
-                ErrorRendererModule.render(modules.ErrorRendererModules,
-                                           requestId,
+                ErrorRendererModule.render(modules.modules.ErrorRendererModules,
+                                           ctx,
                                            504,
                                            "Gateway Time-out",
-                                           Some(service),
-                                           request)
+                                           Some(service))
               case e =>
                 request.discardEntityBytes()
-                ErrorRendererModule.render(modules.ErrorRendererModules,
-                                           requestId,
-                                           502,
-                                           e.getMessage,
-                                           Some(service),
-                                           request)
+                ErrorRendererModule.render(modules.modules.ErrorRendererModules, ctx, 502, e.getMessage, Some(service))
             }
         }
 
-        PreconditionModule.validatePreconditions(modules.PreconditionModules, requestId, service, request) match {
+        PreconditionModule.validatePreconditions(modules.modules.PreconditionModules, ctx, service) match {
           case Left(resp) => FastFuture.successful(resp)
           case Right(_) =>
             (callRestriction, withApiKeyOrNot) match {
@@ -253,20 +246,20 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
                 request.discardEntityBytes()
                 FastFuture.successful(
                   ErrorRendererModule
-                    .render(modules.ErrorRendererModules, requestId, 401, "No ApiKey provided", Some(service), request)
+                    .render(modules.modules.ErrorRendererModules, ctx, 401, "No ApiKey provided", Some(service))
                 )
               case (PrivateCall, waon @ WithApiKey(_)) => makeTheCall(waon)
               case (PrivateCall, BadApiKey) =>
                 request.discardEntityBytes()
                 FastFuture.successful(
                   ErrorRendererModule
-                    .render(modules.ErrorRendererModules, requestId, 401, "Bad ApiKey provided", Some(service), request)
+                    .render(modules.modules.ErrorRendererModules, ctx, 401, "Bad ApiKey provided", Some(service))
                 )
               case _ =>
                 request.discardEntityBytes()
                 FastFuture.successful(
                   ErrorRendererModule
-                    .render(modules.ErrorRendererModules, requestId, 401, "No ApiKey provided", Some(service), request)
+                    .render(modules.modules.ErrorRendererModules, ctx, 401, "No ApiKey provided", Some(service))
                 )
             }
         }
@@ -274,7 +267,7 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
       case None =>
         request.discardEntityBytes()
         FastFuture.successful(
-          ErrorRendererModule.render(modules.ErrorRendererModules, requestId, 404, "No ApiKey provided", None, request)
+          ErrorRendererModule.render(modules.modules.ErrorRendererModules, ctx, 404, "No ApiKey provided", None)
         )
     }
     fu.andThen { case _ => startCtx.close() }

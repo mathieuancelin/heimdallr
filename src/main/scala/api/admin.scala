@@ -20,9 +20,9 @@ import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
 class AdminApi[A, K](config: ProxyConfig[A, K],
-                  store: Store[A, K],
-                  metrics: Statsd[A, K],
-                  commands: Commands[A, K],
+                     store: Store[A, K],
+                     metrics: Statsd[A, K],
+                     commands: Commands[A, K],
                      encoders: Encoders[A, K])
     extends Startable[AdminApi[A, K]]
     with Stoppable[AdminApi[A, K]] {

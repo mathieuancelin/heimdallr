@@ -4,14 +4,14 @@ enablePlugins(JavaAgent)
 name := """heimdallr"""
 organization := "io.heimdallr"
 version := "1.0.0"
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.6"
 
 libraryDependencies ++= {
   lazy val akkaHttpVersion  = "10.1.1"
   lazy val akkaVersion      = "2.5.12"
   lazy val circeVersion     = "0.9.3"
   lazy val bcVersion        = "1.59"
-  lazy val scalaTestVersion = "3.0.4"
+  lazy val scalaTestVersion = "3.0.5"
   Seq(
     "com.typesafe.akka"      %% "akka-http"          % akkaHttpVersion,
     "com.typesafe.akka"      %% "akka-http2-support" % akkaHttpVersion,

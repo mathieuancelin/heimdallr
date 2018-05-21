@@ -24,20 +24,19 @@ import io.heimdallr.util.{Startable, Stoppable}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-case class Proxy[A, K](config: ProxyConfig[A, K],
-                    modules: ModulesConfig[A, K],
-                    extensions: Extensions[A, K],
-                    _store: Option[Store[A, K]] = None)
+case class Proxy[A, K](config: ProxyConfig[A, K], modules: Modules[A, K])
     extends Startable[Proxy[A, K]]
     with Stoppable[Proxy[A, K]] {
 
   val actorSystem = ActorSystem("heimdallr")
-  val encoders    = new Encoders[A, K](extensions)
-  val decoders    = new Decoders[A, K](extensions)
+  val encoders    = new Encoders[A, K](modules.extensions)
+  val decoders    = new Decoders[A, K](modules.extensions)
   val commands    = new Commands[A, K](decoders)
   val statsd      = new Statsd[A, K](config, actorSystem)
   val store: Store[A, K] =
-    _store.getOrElse(new AtomicStore[A, K](config.services.groupBy(_.domain), config.state, statsd, encoders, decoders))
+    modules.store.getOrElse(
+      new AtomicStore[A, K](config.services.groupBy(_.domain), config.state, statsd, encoders, decoders)
+    )
   val httpProxy = new HttpProxy(config, store, modules, statsd)
   val adminApi  = new AdminApi[A, K](config, store, statsd, commands, encoders)
 
@@ -109,12 +108,10 @@ object Proxy {
 
   private val logger = LoggerFactory.getLogger("heimdallr")
 
-  def withConfig[A, K](config: ProxyConfig[A, K],
-                    modules: ModulesConfig[A, K],
-                       extensions: Extensions[A, K]): Proxy[A, K] =
-    new Proxy[A, K](config, modules, extensions)
+  def withConfig[A, K](config: ProxyConfig[A, K], modules: Modules[A, K]): Proxy[A, K] =
+    new Proxy[A, K](config, modules)
   def fromConfigPath[A, K](path: String,
-                        modules: ModulesConfig[A, K],
+                           modules: Modules[A, K],
                            extensions: Extensions[A, K]): Either[ConfigError, Proxy[A, K]] = {
     if (path.startsWith("http://") || path.startsWith("https://")) {
       logger.info(s"Loading configuration from http resource @ $path")
@@ -142,19 +139,17 @@ object Proxy {
         case Right(json) =>
           val decoders = new Decoders[A, K](extensions)
           decoders.ProxyConfigDecoder.decodeJson(json) match {
-            case Right(config) => Right(new Proxy(config, modules, extensions))
+            case Right(config) => Right(new Proxy(config, modules))
             case Left(e)       => Left(ConfigError(e.message))
           }
       }
       system.terminate()
       either
     } else {
-      fromConfigFile(new File(path), modules, extensions)
+      fromConfigFile(new File(path), modules)
     }
   }
-  def fromConfigFile[A, K](file: File,
-                        modules: ModulesConfig[A, K],
-                           extensions: Extensions[A, K]): Either[ConfigError, Proxy[A, K]] = {
+  def fromConfigFile[A, K](file: File, modules: Modules[A, K]): Either[ConfigError, Proxy[A, K]] = {
     logger.info(s"Loading configuration from file @ ${file.toPath.toString}")
     val withLoader = ConfigParseOptions.defaults.setClassLoader(getClass.getClassLoader)
     val conf = ConfigFactory
@@ -166,15 +161,15 @@ object Proxy {
     io.circe.parser.parse(jsonConf) match {
       case Left(e) => Left(ConfigError(e.message))
       case Right(json) =>
-        val decoders = new Decoders[A, K](extensions)
+        val decoders = new Decoders[A, K](modules.extensions)
         decoders.ProxyConfigDecoder.decodeJson(json) match {
-          case Right(config) => Right(new Proxy(config, modules, extensions))
+          case Right(config) => Right(new Proxy(config, modules))
           case Left(e)       => Left(ConfigError(e.message))
         }
     }
   }
   def readProxyConfigFromFile[A, K](file: File,
-                                 reload: Boolean = false,
+                                    reload: Boolean = false,
                                     extensions: Extensions[A, K]): Either[ConfigError, ProxyConfig[A, K]] = {
     if (reload)
       logger.info(s"Reloading configuration from file @ ${file.toPath.toString}")

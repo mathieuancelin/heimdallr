@@ -6,7 +6,6 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import io.circe.Decoder.Result
 import io.circe.{Decoder, Encoder, HCursor, Json}
 import io.heimdallr.models._
 import io.heimdallr.util.Implicits._
@@ -19,13 +18,9 @@ object NoExtension extends Extensions[NoExtension, NoExtension] {
 
   val singleton = NoExtension()
 
-  implicit val NoExtensionDecoder: Decoder[NoExtension] = new Decoder[NoExtension] {
-    override def apply(c: HCursor): Result[NoExtension] = Right(NoExtension())
-  }
+  implicit val NoExtensionDecoder: Decoder[NoExtension] = (c: HCursor) => Right(NoExtension())
 
-  implicit val NoExtensionEncoder: Encoder[NoExtension] = new Encoder[NoExtension] {
-    override def apply(a: NoExtension): Json = Json.Null
-  }
+  implicit val NoExtensionEncoder: Encoder[NoExtension] = (a: NoExtension) => Json.Null
 
   override def serviceExtensionEncoder: Encoder[NoExtension] = NoExtensionEncoder
 
@@ -36,15 +31,8 @@ object NoExtension extends Extensions[NoExtension, NoExtension] {
   override def apiKeyExtensionDecoder: Decoder[NoExtension] = NoExtensionDecoder
 }
 
-trait Extensions[A, K] {
-  def serviceExtensionEncoder: Encoder[A]
-  def serviceExtensionDecoder: Decoder[A]
-  def apiKeyExtensionEncoder: Encoder[K]
-  def apiKeyExtensionDecoder: Decoder[K]
-}
-
-object Modules {
-  val defaultModules: ModulesConfig[NoExtension, NoExtension] = ModulesConfig(
+object DefaultModules extends Modules[NoExtension, NoExtension] {
+  val modules: ModulesConfig[NoExtension, NoExtension] = ModulesConfig(
     Seq(
       new DefaultPreconditionModule(),
       new DefaultServiceAccessModule(),
@@ -54,15 +42,15 @@ object Modules {
       new DefaultTargetSetChooserModule(),
     )
   )
+  val extensions: Extensions[NoExtension, NoExtension] = NoExtension
 }
 
 class DefaultPreconditionModule extends PreconditionModule[NoExtension, NoExtension] {
 
   override def id: String = "DefaultPreconditionModule"
 
-  override def validatePreconditions(reqId: String,
-                                     service: Service[NoExtension, NoExtension],
-                                     request: HttpRequest): Either[HttpResponse, Unit] = {
+  override def validatePreconditions(ctx: ReqContext,
+                                     service: Service[NoExtension, NoExtension]): Either[HttpResponse, Unit] = {
     if (service.enabled) {
       Right(())
     } else {
@@ -71,7 +59,7 @@ class DefaultPreconditionModule extends PreconditionModule[NoExtension, NoExtens
           404,
           entity = HttpEntity(
             ContentTypes.`application/json`,
-            Json.obj("error" -> Json.fromString("service not found"), "reqId" -> Json.fromString(reqId)).noSpaces
+            Json.obj("error" -> Json.fromString("service not found"), "reqId" -> Json.fromString(ctx.reqId)).noSpaces
           )
         )
       )
@@ -87,8 +75,8 @@ class DefaultServiceAccessModule extends ServiceAccessModule[NoExtension, NoExte
 
   override def id: String = "DefaultServiceAccessModule"
 
-  override def access(reqId: String, service: Service[NoExtension, NoExtension], request: HttpRequest): WithApiKeyOrNot = {
-    request.getHeader(authHeaderName).asOption.flatMap { header =>
+  override def access(ctx: ReqContext, service: Service[NoExtension, NoExtension]): WithApiKeyOrNot = {
+    ctx.request.getHeader(authHeaderName).asOption.flatMap { header =>
       Try {
         val value = header.value()
         if (value.startsWith("Basic")) {
@@ -132,18 +120,17 @@ class DefaultHeadersInTransformationModule extends HeadersInTransformationModule
 
   override def id: String = "DefaultHeadersInTransformationModule"
 
-  override def transform(reqId: String,
+  override def transform(ctx: ReqContext,
                          host: String,
                          service: Service[NoExtension, NoExtension],
                          target: Target,
-                         request: HttpRequest,
                          waon: WithApiKeyOrNot,
                          headers: List[HttpHeader]): List[HttpHeader] = {
     headers.filterNot(_.name() == authHeaderName) ++
     service.additionalHeaders.toList.map(t => RawHeader(t._1, t._2)) :+
-    RawHeader("X-Request-Id", reqId) :+
+    RawHeader("X-Request-Id", ctx.reqId) :+
     RawHeader("X-Fowarded-Host", host) :+
-    RawHeader("X-Fowarded-Scheme", request.uri.scheme)
+    RawHeader("X-Fowarded-Scheme", ctx.request.uri.scheme)
   }
 }
 
@@ -151,11 +138,10 @@ class DefaultHeadersOutTransformationModule extends HeadersOutTransformationModu
 
   override def id: String = "DefaultHeadersOutTransformationModule"
 
-  override def transform(reqId: String,
+  override def transform(ctx: ReqContext,
                          host: String,
                          service: Service[NoExtension, NoExtension],
                          target: Target,
-                         request: HttpRequest,
                          waon: WithApiKeyOrNot,
                          proxyLatency: Long,
                          targetLatency: Long,
@@ -170,14 +156,13 @@ class DefaultErrorRendererModule extends ErrorRendererModule[NoExtension, NoExte
 
   override def id: String = "DefaultErrorRendererModule"
 
-  override def render(reqId: String,
+  override def render(ctx: ReqContext,
                       status: Int,
                       message: String,
-                      service: Option[Service[NoExtension, NoExtension]],
-                      request: HttpRequest): HttpResponse = HttpResponse(
+                      service: Option[Service[NoExtension, NoExtension]]): HttpResponse = HttpResponse(
     status,
     entity = HttpEntity(ContentTypes.`application/json`,
-                        Json.obj("error" -> Json.fromString(message), "reqId" -> Json.fromString(reqId)).noSpaces)
+                        Json.obj("error" -> Json.fromString(message), "reqId" -> Json.fromString(ctx.reqId)).noSpaces)
   )
 }
 
@@ -185,5 +170,6 @@ class DefaultTargetSetChooserModule extends TargetSetChooserModule[NoExtension, 
 
   override def id: String = "DefaultTargetSetChooserModule"
 
-  override def choose(reqId: String, service: Service[NoExtension, NoExtension], request: HttpRequest): Seq[Target] = service.targets
+  override def choose(ctx: ReqContext, service: Service[NoExtension, NoExtension]): Seq[Target] =
+    service.targets
 }
