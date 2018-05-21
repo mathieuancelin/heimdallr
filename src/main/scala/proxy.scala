@@ -21,7 +21,7 @@ import io.heimdallr.store.{AtomicStore, Store}
 import io.heimdallr.statsd.Statsd
 import io.heimdallr.util.{Startable, Stoppable}
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
 
 case class Proxy[A, K](config: ProxyConfig[A, K], modules: Modules[A, K])
@@ -95,12 +95,14 @@ case class Proxy[A, K](config: ProxyConfig[A, K], modules: Modules[A, K])
     this
   }
 
-  def updateState(f: Seq[Service[A, K]] => Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    store.modify(m => f(m.values.toSeq.flatten).groupBy(_.domain)).values.toSeq.flatten
+  def updateState(
+      f: Seq[Service[A, K]] => Seq[Service[A, K]]
+  )(implicit ec: ExecutionContext): Future[Seq[Service[A, K]]] = {
+    store.modify(m => f(m.values.toSeq.flatten).groupBy(_.domain)).map(_.values.toSeq.flatten)
   }
 
-  def getState(): Seq[Service[A, K]] = {
-    store.get().values.toSeq.flatten
+  def getState()(implicit ec: ExecutionContext): Future[Seq[Service[A, K]]] = {
+    store.get().map(_.values.toSeq.flatten)
   }
 }
 

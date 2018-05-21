@@ -14,6 +14,7 @@ import io.heimdallr.store.Store
 import io.heimdallr.statsd._
 import io.heimdallr.util.HttpResponses._
 import io.heimdallr.util.{HttpsSupport, Startable, Stoppable}
+import io.heimdallr.util.Implicits._
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{Future, Promise}
@@ -40,25 +41,29 @@ class AdminApi[A, K](config: ProxyConfig[A, K],
   def handler(request: HttpRequest): Future[HttpResponse] = {
     (request.method, request.uri.path) match {
       case (HttpMethods.GET, Uri.Path("/api/services")) => {
-        FastFuture.successful(Ok(encoders.SeqOfServiceEncoder(store.get().values.flatten.toSeq)))
+        store.get().map { map =>
+          Ok(encoders.SeqOfServiceEncoder(map.values.flatten.toSeq))
+        }
       }
       case (HttpMethods.GET, path) if path.startsWith(Uri.Path("/api/services/")) => {
         val serviceId = path.toString.replace("/api/services/", "")
-        store.get().values.flatten.toSeq.find(_.id == serviceId) match {
-          case Some(service) => FastFuture.successful(Ok(encoders.ServiceEncoder(service)))
-          case None          => FastFuture.successful(NotFound(s"Service with id $serviceId does not exist"))
+        store.get().map { map =>
+          map.values.flatten.toSeq.find(_.id == serviceId) match {
+            case Some(service) => Ok(encoders.ServiceEncoder(service))
+            case None          => NotFound(s"Service with id $serviceId does not exist")
+          }
         }
       }
       case (HttpMethods.POST, Uri.Path("/api/_command")) =>
-        request.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { bs =>
+        request.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).flatMap { bs =>
           val body = bs.utf8String
           io.circe.parser.parse(body) match {
-            case Left(_) => BadRequest("Error while parsing body")
+            case Left(_) => BadRequest("Error while parsing body").asFuture
             case Right(json) =>
               logger.info(s"received command: ${json.noSpaces}")
               commands.decode(json.hcursor.downField("command").as[String].getOrElse("none"), json) match {
-                case Left(_)        => BadRequest("Error while parsing command")
-                case Right(command) => Ok(command.applyModification(store, encoders))
+                case Left(_)        => BadRequest("Error while parsing command").asFuture
+                case Right(command) => command.applyModification(store, encoders).map(Ok(_))
               }
           }
         }

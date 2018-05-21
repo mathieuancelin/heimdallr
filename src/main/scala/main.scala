@@ -12,8 +12,8 @@ object Main {
 
     import org.apache.commons.io.monitor.{FileAlterationListenerAdaptor, FileAlterationMonitor, FileAlterationObserver};
 
-    val observer = new FileAlterationObserver(file.getParentFile());
-    val monitor  = new FileAlterationMonitor(500);
+    val observer = new FileAlterationObserver(file.getParentFile())
+    val monitor  = new FileAlterationMonitor(500)
     val listener = new FileAlterationListenerAdaptor() {
       override def onFileChange(changedFile: File) {
         if (changedFile.getAbsolutePath == file.getAbsolutePath) {
@@ -104,6 +104,9 @@ object Main {
           case Right(proxy) => {
             val configFile   = new File(path)
             val startedProxy = proxy.start().stopOnShutdown()
+
+            implicit val ec = proxy.actorSystem.dispatcher
+
             watchFile(configFile) { f =>
               Proxy.readProxyConfigFromFile(configFile, true, NoExtension) match {
                 case Left(e)       => logger.error(s"Error while loading config file @ $path: $e")
@@ -120,6 +123,9 @@ object Main {
           case Right(proxy) => {
             val configFile   = new File(path)
             val startedProxy = proxy.start().stopOnShutdown()
+
+            implicit val ec = proxy.actorSystem.dispatcher
+
             watchFile(configFile) { f =>
               Proxy.readProxyConfigFromFile(configFile, true, NoExtension) match {
                 case Left(e)       => logger.error(s"Error while loading config file @ $path: $e")

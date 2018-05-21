@@ -3,6 +3,7 @@ package io.heimdallr.models
 import java.util.concurrent.TimeUnit
 
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.util.FastFuture
 import io.circe.Decoder.Result
 import io.circe._
 import io.circe.generic.semiauto._
@@ -10,6 +11,7 @@ import io.heimdallr.modules._
 import io.heimdallr.store.Store
 import io.heimdallr.util.IdGenerator
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 
 case class Target(url: String, weight: Int = 1, protocol: HttpProtocol = HttpProtocols.`HTTP/1.1`) {
@@ -161,8 +163,12 @@ class Encoders[A, K](extensions: Extensions[A, K]) {
   implicit val ProxyConfigEncoder: Encoder[ProxyConfig[A, K]]           = deriveEncoder[ProxyConfig[A, K]]
 }
 
-sealed trait WithApiKeyOrNot
-case object NoApiKey                        extends WithApiKeyOrNot
+sealed trait WithApiKeyOrNot {
+  def isNoApiKey: Boolean = false
+}
+case object NoApiKey extends WithApiKeyOrNot {
+  override def isNoApiKey: Boolean = true
+}
 case object BadApiKey                       extends WithApiKeyOrNot
 case class WithApiKey[K](apiKey: ApiKey[K]) extends WithApiKeyOrNot
 
@@ -175,9 +181,10 @@ case class ConfigError(message: String)
 trait Command[A, K] {
   def command: String
   def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]]
-  def applyModification(store: Store[A, K], encoders: Encoders[A, K]): Json = {
-    store.modify(s => modify(s.values.flatten.toSeq).groupBy(_.domain))
-    Json.obj("result" -> Json.fromString("command applied"))
+  def applyModification(store: Store[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.modify(s => modify(s.values.flatten.toSeq).groupBy(_.domain)).map { r =>
+      Json.obj("result" -> Json.fromString("command applied"))
+    }
   }
 }
 
@@ -187,26 +194,33 @@ case class NothingCommand[A, K](command: String) extends Command[A, K] {
 
 case class GetStateCommand[A, K](command: String) extends Command[A, K] {
   def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = state
-  override def applyModification(store: Store[A, K], encoders: Encoders[A, K]): Json = {
-    val seq = store.get().values.flatten.toSeq
-    Json.obj("state" -> encoders.SeqOfServiceEncoder(seq))
+  override def applyModification(store: Store[A, K],
+                                 encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.get().map { map =>
+      val seq = map.values.flatten.toSeq
+      Json.obj("state" -> encoders.SeqOfServiceEncoder(seq))
+    }
   }
 }
 
 case class GetServiceCommand[A, K](command: String, serviceId: String) extends Command[A, K] {
   def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = state
-  override def applyModification(store: Store[A, K], encoders: Encoders[A, K]): Json = {
-    store.get().values.flatten.toSeq.find(_.id == serviceId) match {
-      case Some(service) => encoders.ServiceEncoder(service)
-      case None          => Json.obj("error" -> Json.fromString("not found"))
+  override def applyModification(store: Store[A, K],
+                                 encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.get().map { map =>
+      map.values.flatten.toSeq.find(_.id == serviceId) match {
+        case Some(service) => encoders.ServiceEncoder(service)
+        case None          => Json.obj("error" -> Json.fromString("not found"))
+      }
     }
   }
 }
 
 case class GetMetricsCommand[A, K](command: String) extends Command[A, K] {
   def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = state
-  override def applyModification(store: Store[A, K], encoders: Encoders[A, K]): Json = {
-    Json.obj("metrics" -> Json.obj())
+  override def applyModification(store: Store[A, K],
+                                 encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    FastFuture.successful(Json.obj("metrics" -> Json.obj()))
   }
 }
 

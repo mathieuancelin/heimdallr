@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.{Future, Promise, TimeoutException}
 import scala.util.{Failure, Success}
 
-class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Modules[A, K], statsd: Statsd[A, K])
+class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], mods: Modules[A, K], statsd: Statsd[A, K])
     extends Startable[HttpProxy[A, K]]
     with Stoppable[HttpProxy[A, K]] {
 
@@ -69,177 +69,158 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
     val requestId = UUID.randomUUID().toString
     val ctx       = ReqContext(requestId, TypedMap.empty, request)
 
-    BeforeAfterModule.beforeRequest(modules.modules.BeforeAfterModules, ctx)
+    mods.modules.BeforeAfterModule.beforeRequest(ctx)
 
     val host = extractHost(request)
-    val fu = ServiceFinderModule.findService(modules.modules.ServiceFinderModule,
-                                             store,
-                                             ctx,
-                                             host,
-                                             request.uri.path,
-                                             request.headers.groupBy(_.name()).mapValues(_.last)) match {
-      case Some(service) => {
-        val rawSeq = TargetSetChooserModule.choose(modules.modules.TargetSetChooserModule, ctx, service)
-        val seq    = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
-        val withApiKeyOrNot =
-          ServiceAccessModule.access(modules.modules.ServiceAccessModules, ctx, service)
-        val callRestriction = extractCallRestriction(service, request.uri.path)
+    val fu = mods.modules.ServiceFinderModule.findService(ctx,
+                                                          store,
+                                                          host,
+                                                          request.uri.path,
+                                                          request.headers.groupBy(_.name()).mapValues(_.last)) flatMap {
+      case Some(service) =>
+        mods.modules.TargetSetChooserModule.choose(ctx, service).flatMap { rawSeq =>
+          val seq             = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
+          val callRestriction = extractCallRestriction(service, request.uri.path)
 
-        @inline
-        def makeTheCall(waon: WithApiKeyOrNot): Future[HttpResponse] = {
-          Retry
-            .retry(service.clientConfig.retry) {
-              val index  = counter.incrementAndGet() % (if (seq.nonEmpty) seq.size else 1)
-              val target = seq.apply(index)
-              val circuitBreaker = circuitBreakers.computeIfAbsent(
-                target.url,
-                _ =>
-                  new CircuitBreaker(
-                    system.scheduler,
-                    maxFailures = service.clientConfig.maxFailures,
-                    callTimeout = service.clientConfig.callTimeout,
-                    resetTimeout = service.clientConfig.resetTimeout
-                )
-              )
-              val headersWithoutHost = request.headers.filterNot(t => t.name() == "Host")
-              val headersIn: Seq[HttpHeader] = headersWithoutHost ++
-              HeadersInTransformationModule.transform(modules.modules.HeadersInTransformationModules,
-                                                      ctx,
-                                                      host,
-                                                      service,
-                                                      target,
-                                                      waon,
-                                                      headersWithoutHost.toList) :+
-              Host(target.host)
-              val proxyRequest = request.copy(
-                uri = request.uri.copy(
-                  path = Uri.Path(service.targetRoot) ++ request.uri.path,
-                  scheme = target.scheme,
-                  authority = Authority(host = Uri.NamedHost(target.host), port = target.port)
-                ),
-                headers = headersIn.toList,
-                protocol = target.protocol
-              )
-              val top = System.currentTimeMillis()
-              request.header[UpgradeToWebSocket] match {
-                case Some(upgrade) => {
-                  val flow = ActorFlow.actorRef(
-                    out =>
-                      WebSocketProxyActor.props(
-                        proxyRequest.uri.copy(scheme = if (target.scheme == "https") "wss" else "ws"),
-                        materializer,
-                        out,
-                        http,
-                        headersIn
-                    )
+          @inline
+          def makeTheCall(waon: WithApiKeyOrNot): Future[HttpResponse] = {
+            Retry
+              .retry(service.clientConfig.retry) {
+                val index  = counter.incrementAndGet() % (if (seq.nonEmpty) seq.size else 1)
+                val target = seq.apply(index)
+                val circuitBreaker = circuitBreakers.computeIfAbsent(
+                  target.url,
+                  _ =>
+                    new CircuitBreaker(
+                      system.scheduler,
+                      maxFailures = service.clientConfig.maxFailures,
+                      callTimeout = service.clientConfig.callTimeout,
+                      resetTimeout = service.clientConfig.resetTimeout
                   )
-                  FastFuture.successful(upgrade.handleMessages(flow)).andThen {
-                    case Success(resp) =>
-                      BeforeAfterModule.afterRequestWebSocketSuccess(modules.modules.BeforeAfterModules, ctx)
-                      if (logger.isInfoEnabled) {
-                        logger.info(
-                          s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
-                            .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
+                )
+                val headersWithoutHost = request.headers.filterNot(t => t.name() == "Host")
+                mods.modules.HeadersInTransformationModule
+                  .transform(ctx, host, service, target, waon, headersWithoutHost.toList) flatMap { _headersIn =>
+                  val headersIn = headersWithoutHost ++ _headersIn :+ Host(target.host)
+                  val proxyRequest = request.copy(
+                    uri = request.uri.copy(
+                      path = Uri.Path(service.targetRoot) ++ request.uri.path,
+                      scheme = target.scheme,
+                      authority = Authority(host = Uri.NamedHost(target.host), port = target.port)
+                    ),
+                    headers = headersIn.toList,
+                    protocol = target.protocol
+                  )
+                  val top = System.currentTimeMillis()
+                  request.header[UpgradeToWebSocket] match {
+                    case Some(upgrade) => {
+                      val flow = ActorFlow.actorRef(
+                        out =>
+                          WebSocketProxyActor.props(
+                            proxyRequest.uri.copy(scheme = if (target.scheme == "https") "wss" else "ws"),
+                            materializer,
+                            out,
+                            http,
+                            headersIn
                         )
-                      }
-                  }
-                }
-                case None => {
-                  val callStart = System.currentTimeMillis()
-                  circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).map { resp =>
-                    resp.copy(
-                      headers = HeadersOutTransformationModule.transform(
-                        modules.modules.HeadersOutTransformationModules,
-                        ctx,
-                        host,
-                        service,
-                        target,
-                        waon,
-                        System.currentTimeMillis() - start,
-                        System.currentTimeMillis() - callStart,
-                        resp.headers.toList
                       )
-                    )
-                  } andThen {
-                    case Success(resp) =>
-                      BeforeAfterModule.afterRequestSuccess(modules.modules.BeforeAfterModules, ctx)
-                      if (logger.isInfoEnabled) {
-                        logger.info(
-                          s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
-                            .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
-                        )
+                      FastFuture.successful(upgrade.handleMessages(flow)).andThen {
+                        case Success(resp) =>
+                          mods.modules.BeforeAfterModule.afterRequestWebSocketSuccess(ctx)
+                          if (logger.isInfoEnabled) {
+                            logger.info(
+                              s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
+                                .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
+                            )
+                          }
                       }
+                    }
+                    case None => {
+                      val callStart = System.currentTimeMillis()
+                      circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).flatMap { resp =>
+                        mods.modules.HeadersOutTransformationModule
+                          .transform(
+                            ctx,
+                            host,
+                            service,
+                            target,
+                            waon,
+                            System.currentTimeMillis() - start,
+                            System.currentTimeMillis() - callStart,
+                            resp.headers.toList
+                          )
+                          .map { headers =>
+                            resp.copy(
+                              headers = headers
+                            )
+                          }
+                      } andThen {
+                        case Success(resp) =>
+                          mods.modules.BeforeAfterModule.afterRequestSuccess(ctx)
+                          if (logger.isInfoEnabled) {
+                            logger.info(
+                              s"$requestId - ${service.id} - ${request.uri.scheme}://$host:${request.uri.effectivePort} -> ${target.url} - ${request.method.value} ${request.uri.path
+                                .toString()} ${resp.status.value} - ${System.currentTimeMillis() - top} ms."
+                            )
+                          }
+                      }
+                    }
                   }
                 }
               }
-            }
-            .recover {
-              case _: akka.pattern.CircuitBreakerOpenException =>
-                request.discardEntityBytes()
-                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
-                ErrorRendererModule.render(modules.modules.ErrorRendererModule,
-                                           ctx,
-                                           502,
-                                           "Circuit breaker is open",
-                                           Some(service))
-              case _: TimeoutException =>
-                request.discardEntityBytes()
-                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
-                ErrorRendererModule.render(modules.modules.ErrorRendererModule,
-                                           ctx,
-                                           504,
-                                           "Gateway Time-out",
-                                           Some(service))
-              case e =>
-                request.discardEntityBytes()
-                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
-                ErrorRendererModule.render(modules.modules.ErrorRendererModule, ctx, 502, e.getMessage, Some(service))
-            }
-        }
+              .recoverWith {
+                case _: akka.pattern.CircuitBreakerOpenException =>
+                  request.discardEntityBytes()
+                  mods.modules.BeforeAfterModule.afterRequestError(ctx)
+                  mods.modules.ErrorRendererModule.render(ctx, 502, "Circuit breaker is open", Some(service))
+                case _: TimeoutException =>
+                  request.discardEntityBytes()
+                  mods.modules.BeforeAfterModule.afterRequestError(ctx)
+                  mods.modules.ErrorRendererModule.render(ctx, 504, "Proxy Time-out", Some(service))
+                case e =>
+                  request.discardEntityBytes()
+                  mods.modules.BeforeAfterModule.afterRequestError(ctx)
+                  mods.modules.ErrorRendererModule.render(ctx, 502, e.getMessage, Some(service))
+              }
+          }
 
-        PreconditionModule.validatePreconditions(modules.modules.PreconditionModules, ctx, service) match {
-          case Left(resp) =>
-            BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
-            FastFuture.successful(resp)
-          case Right(_) =>
-            (callRestriction, withApiKeyOrNot) match {
-              case (PublicCall, waon) => makeTheCall(waon)
-              case (PrivateCall, NoApiKey) =>
-                request.discardEntityBytes()
-                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
-                FastFuture.successful(
-                  ErrorRendererModule
-                    .render(modules.modules.ErrorRendererModule, ctx, 401, "No ApiKey provided", Some(service))
-                )
-              case (PrivateCall, waon @ WithApiKey(_)) => makeTheCall(waon)
-              case (PrivateCall, BadApiKey) =>
-                request.discardEntityBytes()
-                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
-                FastFuture.successful(
-                  ErrorRendererModule
-                    .render(modules.modules.ErrorRendererModule, ctx, 401, "Bad ApiKey provided", Some(service))
-                )
-              case _ =>
-                request.discardEntityBytes()
-                BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
-                FastFuture.successful(
-                  ErrorRendererModule
-                    .render(modules.modules.ErrorRendererModule, ctx, 401, "No ApiKey provided", Some(service))
-                )
+          mods.modules.ServiceAccessModule.access(ctx, service) flatMap { withApiKeyOrNot =>
+            mods.modules.PreconditionModule.validatePreconditions(ctx, service) flatMap {
+              case Left(resp) =>
+                mods.modules.BeforeAfterModule.afterRequestError(ctx)
+                FastFuture.successful(resp)
+              case Right(_) =>
+                (callRestriction, withApiKeyOrNot) match {
+                  case (PublicCall, waon) => makeTheCall(waon)
+                  case (PrivateCall, NoApiKey) =>
+                    request.discardEntityBytes()
+                    mods.modules.BeforeAfterModule.afterRequestError(ctx)
+                    mods.modules.ErrorRendererModule
+                      .render(ctx, 401, "No ApiKey provided", Some(service))
+                  case (PrivateCall, waon @ WithApiKey(_)) => makeTheCall(waon)
+                  case (PrivateCall, BadApiKey) =>
+                    request.discardEntityBytes()
+                    mods.modules.BeforeAfterModule.afterRequestError(ctx)
+                    mods.modules.ErrorRendererModule
+                      .render(ctx, 401, "Bad ApiKey provided", Some(service))
+                  case _ =>
+                    request.discardEntityBytes()
+                    mods.modules.BeforeAfterModule.afterRequestError(ctx)
+                    mods.modules.ErrorRendererModule
+                      .render(ctx, 401, "No ApiKey provided", Some(service))
+                }
             }
+          }
         }
-      }
       case None =>
         request.discardEntityBytes()
-        BeforeAfterModule.afterRequestError(modules.modules.BeforeAfterModules, ctx)
-        FastFuture.successful(
-          ErrorRendererModule.render(modules.modules.ErrorRendererModule, ctx, 404, "No ApiKey provided", None)
-        )
+        mods.modules.BeforeAfterModule.afterRequestError(ctx)
+        mods.modules.ErrorRendererModule.render(ctx, 404, "No ApiKey provided", None)
     }
     fu.andThen {
       case _ =>
+        mods.modules.BeforeAfterModule.afterRequestEnd(ctx)
         startCtx.close()
-        BeforeAfterModule.afterRequestEnd(modules.modules.BeforeAfterModules, ctx)
     }
   }
 

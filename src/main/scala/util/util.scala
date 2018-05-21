@@ -7,8 +7,8 @@ import java.security._
 import java.util.Optional
 import java.util.concurrent.atomic.AtomicLong
 import java.util.regex.Pattern
-import javax.net.ssl._
 
+import javax.net.ssl._
 import akka.actor.{
   Actor,
   ActorRef,
@@ -22,6 +22,7 @@ import akka.actor.{
   Terminated
 }
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse}
+import akka.http.scaladsl.util.FastFuture
 import akka.http.scaladsl.{ConnectionContext, HttpsConnectionContext}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.stream.{Materializer, OverflowStrategy}
@@ -294,6 +295,9 @@ object Implicits {
         None
       }
     }
+  }
+  implicit class Futurable[A](val any: A) extends AnyVal {
+    def asFuture: Future[A] = FastFuture.successful(any)
   }
 }
 

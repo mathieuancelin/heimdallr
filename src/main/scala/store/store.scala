@@ -24,8 +24,10 @@ import scala.util.Failure
 case class UpdateStoreFile[A, K](path: String, state: Map[String, Seq[Service[A, K]]])
 
 trait Store[A, K] extends Startable[Store[A, K]] with Stoppable[Store[A, K]] {
-  def modify(f: Map[String, Seq[Service[A, K]]] => Map[String, Seq[Service[A, K]]]): Map[String, Seq[Service[A, K]]]
-  def get(): Map[String, Seq[Service[A, K]]]
+  def modify(f: Map[String, Seq[Service[A, K]]] => Map[String, Seq[Service[A, K]]])(
+      implicit ec: ExecutionContext
+  ): Future[Map[String, Seq[Service[A, K]]]]
+  def get()(implicit ec: ExecutionContext): Future[Map[String, Seq[Service[A, K]]]]
 }
 
 class AtomicStore[A, K](initialState: Map[String, Seq[Service[A, K]]] = Map.empty[String, Seq[Service[A, K]]],
@@ -83,24 +85,28 @@ class AtomicStore[A, K](initialState: Map[String, Seq[Service[A, K]]] = Map.empt
     }
   }
 
-  def modify(f: Map[String, Seq[Service[A, K]]] => Map[String, Seq[Service[A, K]]]): Map[String, Seq[Service[A, K]]] = {
+  def modify(
+      f: Map[String, Seq[Service[A, K]]] => Map[String, Seq[Service[A, K]]]
+  )(implicit ec: ExecutionContext): Future[Map[String, Seq[Service[A, K]]]] = {
     statsd.increment("store-reads")
     val modifiedState = ref.updateAndGet(services => f(services))
     stateConfig.flatMap(_.local).map(_.path).foreach { path =>
       actor ! UpdateStoreFile(path, modifiedState)
     }
-    modifiedState
+    FastFuture.successful(modifiedState)
   }
 
-  def get(): Map[String, Seq[Service[A, K]]] = {
+  def get()(implicit ec: ExecutionContext): Future[Map[String, Seq[Service[A, K]]]] = {
     statsd.increment("store-writes")
-    ref.get()
+    FastFuture.successful(ref.get())
   }
 
   override def start(): Stoppable[Store[A, K]] = {
     stateConfig.flatMap(_.local).foreach { config =>
       system.scheduler.schedule(0.seconds, config.writeEvery) {
-        actor ! UpdateStoreFile(config.path, get())
+        get().map { map =>
+          actor ! UpdateStoreFile(config.path, map)
+        }
       }
     }
     stateConfig.flatMap(_.remote).foreach { config =>
