@@ -219,7 +219,6 @@ docker run -d -p "8083:80" emilevauge/whoami
 
 ## Features
 
-- [ ] add module for before/after request
 - [ ] use future for modules ?
 
 - [ ] built-in kafka support as commands input
