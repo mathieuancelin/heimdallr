@@ -93,27 +93,6 @@ case class ApiConfig(
     enabled: Boolean = true
 )
 
-case class ModulesConfig[A, K](modules: Seq[_ <: Module[A, K]] = Seq.empty) {
-  lazy val PreconditionModules: Seq[PreconditionModule[A, K]] = modules.collect {
-    case m: PreconditionModule[A, K] => m
-  }
-  lazy val ServiceAccessModules: Seq[ServiceAccessModule[A, K]] = modules.collect {
-    case m: ServiceAccessModule[A, K] => m
-  }
-  lazy val HeadersInTransformationModules: Seq[HeadersInTransformationModule[A, K]] = modules.collect {
-    case m: HeadersInTransformationModule[A, K] => m
-  }
-  lazy val HeadersOutTransformationModules: Seq[HeadersOutTransformationModule[A, K]] = modules.collect {
-    case m: HeadersOutTransformationModule[A, K] => m
-  }
-  lazy val ErrorRendererModules: Seq[ErrorRendererModule[A, K]] = modules.collect {
-    case m: ErrorRendererModule[A, K] => m
-  }
-  lazy val TargetSetChooserModules: Seq[TargetSetChooserModule[A, K]] = modules.collect {
-    case m: TargetSetChooserModule[A, K] => m
-  }
-}
-
 case class LoggersConfig(level: String, configPath: Option[String] = None)
 
 case class ProxyConfig[A, K](

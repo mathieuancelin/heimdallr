@@ -8,7 +8,9 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import io.circe.{Decoder, Encoder, HCursor, Json}
 import io.heimdallr.models._
+import io.heimdallr.store.Store
 import io.heimdallr.util.Implicits._
+import io.heimdallr.util.RegexPool
 
 import scala.util.Try
 
@@ -31,17 +33,45 @@ object NoExtension extends Extensions[NoExtension, NoExtension] {
   override def apiKeyExtensionDecoder: Decoder[NoExtension] = NoExtensionDecoder
 }
 
+//case class DefaultModulesConfig[A, K](modules: Seq[_ <: Module[A, K]] = Seq.empty) extends ModulesConfig[A, K] {
+//  lazy val PreconditionModules: Seq[PreconditionModule[A, K]] = modules.collect {
+//    case m: PreconditionModule[A, K] => m
+//  }
+//  lazy val ServiceAccessModules: Seq[ServiceAccessModule[A, K]] = modules.collect {
+//    case m: ServiceAccessModule[A, K] => m
+//  }
+//  lazy val HeadersInTransformationModules: Seq[HeadersInTransformationModule[A, K]] = modules.collect {
+//    case m: HeadersInTransformationModule[A, K] => m
+//  }
+//  lazy val HeadersOutTransformationModules: Seq[HeadersOutTransformationModule[A, K]] = modules.collect {
+//    case m: HeadersOutTransformationModule[A, K] => m
+//  }
+//  lazy val ErrorRendererModule: ErrorRendererModule[A, K] = modules.collect {
+//    case m: ErrorRendererModule[A, K] => m
+//  } last
+//  lazy val TargetSetChooserModule: TargetSetChooserModule[A, K] = modules.collect {
+//    case m: TargetSetChooserModule[A, K] => m
+//  } last
+//  lazy val ServiceFinderModule: ServiceFinderModule[A, K] = modules.collect {
+//    case m: ServiceFinderModule[A, K] => m
+//  } last
+//}
+
 object DefaultModules extends Modules[NoExtension, NoExtension] {
-  val modules: ModulesConfig[NoExtension, NoExtension] = ModulesConfig(
-    Seq(
-      new DefaultPreconditionModule(),
-      new DefaultServiceAccessModule(),
-      new DefaultHeadersInTransformationModule(),
-      new DefaultHeadersOutTransformationModule(),
-      new DefaultErrorRendererModule(),
-      new DefaultTargetSetChooserModule(),
-    )
-  )
+  val modules: ModulesConfig[NoExtension, NoExtension] = new ModulesConfig[NoExtension, NoExtension] {
+    override def PreconditionModules: Seq[PreconditionModule[NoExtension, NoExtension]] =
+      Seq(new DefaultPreconditionModule())
+    override def ServiceAccessModules: Seq[ServiceAccessModule[NoExtension, NoExtension]] =
+      Seq(new DefaultServiceAccessModule())
+    override def HeadersInTransformationModules: Seq[HeadersInTransformationModule[NoExtension, NoExtension]] =
+      Seq(new DefaultHeadersInTransformationModule())
+    override def HeadersOutTransformationModules: Seq[HeadersOutTransformationModule[NoExtension, NoExtension]] =
+      Seq(new DefaultHeadersOutTransformationModule())
+    override def ErrorRendererModule: ErrorRendererModule[NoExtension, NoExtension] = new DefaultErrorRendererModule()
+    override def TargetSetChooserModule: TargetSetChooserModule[NoExtension, NoExtension] =
+      new DefaultTargetSetChooserModule()
+    override def ServiceFinderModule: ServiceFinderModule[NoExtension, NoExtension] = new DefaultServiceFinderModule()
+  }
   val extensions: Extensions[NoExtension, NoExtension] = NoExtension
 }
 
@@ -172,4 +202,66 @@ class DefaultTargetSetChooserModule extends TargetSetChooserModule[NoExtension, 
 
   override def choose(ctx: ReqContext, service: Service[NoExtension, NoExtension]): Seq[Target] =
     service.targets
+}
+
+class DefaultServiceFinderModule extends ServiceFinderModule[NoExtension, NoExtension] {
+
+  override def id: String = "DefaultServiceFinderModule"
+
+  override def findService(ctx: ReqContext,
+                           store: Store[NoExtension, NoExtension],
+                           host: String,
+                           path: Uri.Path,
+                           headers: Map[String, HttpHeader]): Option[Service[NoExtension, NoExtension]] = {
+    val uri = path.toString()
+
+    @inline
+    def findSubService(services: Seq[Service[NoExtension, NoExtension]]): Option[Service[NoExtension, NoExtension]] = {
+      val sortedServices = services
+        .filter(_.enabled)
+        .sortWith(
+          (a, _) =>
+            if (a.root.isDefined && a.matchingHeaders.nonEmpty) true
+            else if (a.root.isEmpty && a.matchingHeaders.nonEmpty) true
+            else a.root.isDefined
+        )
+      var found: Option[Service[NoExtension, NoExtension]] = None
+      var index                                            = 0
+      while (found.isEmpty && index < sortedServices.size) {
+        val s = sortedServices(index)
+        index = index + 1
+        if (s.root.isDefined) {
+          if (uri.startsWith(s.root.get)) {
+            if (s.matchingHeaders.nonEmpty) {
+              if (s.matchingHeaders.toSeq.forall(t => headers.get(t._1).exists(_.value() == t._2))) {
+                found = Some(s)
+              }
+            } else {
+              found = Some(s)
+            }
+          }
+        } else {
+          if (s.matchingHeaders.nonEmpty) {
+            if (s.matchingHeaders.toSeq.forall(t => headers.get(t._1).exists(_.value() == t._2))) {
+              found = Some(s)
+            }
+          } else {
+            found = Some(s)
+          }
+        }
+      }
+      found
+    }
+
+    store.get().get(host).flatMap(findSubService) match {
+      case s @ Some(_) => s
+      case None => {
+        val state = store.get()
+        state.keys.find(k => RegexPool(k).matches(host)).flatMap(k => state.get(k)) match {
+          case Some(services) => findSubService(services)
+          case None           => None
+        }
+      }
+    }
+  }
 }

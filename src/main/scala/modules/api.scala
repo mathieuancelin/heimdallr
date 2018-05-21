@@ -24,6 +24,16 @@ trait Modules[A, B] {
   def store: Option[Store[A, B]] = None
 }
 
+trait ModulesConfig[A, K] {
+  def PreconditionModules: Seq[PreconditionModule[A, K]]
+  def ServiceAccessModules: Seq[ServiceAccessModule[A, K]]
+  def HeadersInTransformationModules: Seq[HeadersInTransformationModule[A, K]]
+  def HeadersOutTransformationModules: Seq[HeadersOutTransformationModule[A, K]]
+  def ErrorRendererModule: ErrorRendererModule[A, K]
+  def TargetSetChooserModule: TargetSetChooserModule[A, K]
+  def ServiceFinderModule: ServiceFinderModule[A, K]
+}
+
 // can handle construction mode, maintenance mode
 trait PreconditionModule[A, K] extends Module[A, K] {
   def validatePreconditions(ctx: ReqContext, service: Service[A, K]): Either[HttpResponse, Unit]
@@ -43,6 +53,24 @@ object PreconditionModule {
       }
     }
     Right(())
+  }
+}
+
+trait ServiceFinderModule[A, K] extends Module[A, K] {
+  def findService(ctx: ReqContext,
+                  store: Store[A, K],
+                  host: String,
+                  path: Uri.Path,
+                  headers: Map[String, HttpHeader]): Option[Service[A, K]]
+}
+object ServiceFinderModule {
+  def findService[A, K](module: ServiceFinderModule[A, K],
+                        store: Store[A, K],
+                        ctx: ReqContext,
+                        host: String,
+                        path: Uri.Path,
+                        headers: Map[String, HttpHeader]): Option[Service[A, K]] = {
+    module.findService(ctx, store, host, path, headers)
   }
 }
 
@@ -124,12 +152,12 @@ trait ErrorRendererModule[A, K] extends Module[A, K] {
   def render(ctx: ReqContext, status: Int, message: String, service: Option[Service[A, K]]): HttpResponse
 }
 object ErrorRendererModule {
-  def render[A, K](modules: Seq[ErrorRendererModule[A, K]],
+  def render[A, K](module: ErrorRendererModule[A, K],
                    ctx: ReqContext,
                    status: Int,
                    message: String,
                    service: Option[Service[A, K]]): HttpResponse = {
-    modules.last.render(ctx, status, message, service)
+    module.render(ctx, status, message, service)
   }
 }
 
@@ -138,7 +166,7 @@ trait TargetSetChooserModule[A, K] extends Module[A, K] {
   def choose(ctx: ReqContext, service: Service[A, K]): Seq[Target]
 }
 object TargetSetChooserModule {
-  def choose[A, K](modules: Seq[TargetSetChooserModule[A, K]], ctx: ReqContext, service: Service[A, K]): Seq[Target] = {
-    modules.last.choose(ctx, service)
+  def choose[A, K](module: TargetSetChooserModule[A, K], ctx: ReqContext, service: Service[A, K]): Seq[Target] = {
+    module.choose(ctx, service)
   }
 }

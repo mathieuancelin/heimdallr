@@ -52,59 +52,6 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
     case _                                                     => request.header[Host].map(_.host.address()).getOrElse("--")
   }
 
-  def findService(host: String, path: Uri.Path, headers: Map[String, HttpHeader]): Option[Service[A, K]] = {
-    val uri = path.toString()
-
-    @inline
-    def findSubService(services: Seq[Service[A, K]]): Option[Service[A, K]] = {
-      val sortedServices = services
-        .filter(_.enabled)
-        .sortWith(
-          (a, _) =>
-            if (a.root.isDefined && a.matchingHeaders.nonEmpty) true
-            else if (a.root.isEmpty && a.matchingHeaders.nonEmpty) true
-            else a.root.isDefined
-        )
-      var found: Option[Service[A, K]] = None
-      var index                        = 0
-      while (found.isEmpty && index < sortedServices.size) {
-        val s = sortedServices(index)
-        index = index + 1
-        if (s.root.isDefined) {
-          if (uri.startsWith(s.root.get)) {
-            if (s.matchingHeaders.nonEmpty) {
-              if (s.matchingHeaders.toSeq.forall(t => headers.get(t._1).exists(_.value() == t._2))) {
-                found = Some(s)
-              }
-            } else {
-              found = Some(s)
-            }
-          }
-        } else {
-          if (s.matchingHeaders.nonEmpty) {
-            if (s.matchingHeaders.toSeq.forall(t => headers.get(t._1).exists(_.value() == t._2))) {
-              found = Some(s)
-            }
-          } else {
-            found = Some(s)
-          }
-        }
-      }
-      found
-    }
-
-    store.get().get(host).flatMap(findSubService) match {
-      case s @ Some(_) => s
-      case None => {
-        val state = store.get()
-        state.keys.find(k => RegexPool(k).matches(host)).flatMap(k => state.get(k)) match {
-          case Some(services) => findSubService(services)
-          case None           => None
-        }
-      }
-    }
-  }
-
   def extractCallRestriction(service: Service[A, K], path: Uri.Path): CallRestriction = {
     val uri                 = path.toString()
     val privatePatternMatch = service.privatePatterns.exists(p => RegexPool(p).matches(uri))
@@ -122,9 +69,14 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
     val requestId = UUID.randomUUID().toString
     val ctx       = ReqContext(requestId, TypedMap.empty, request)
     val host      = extractHost(request)
-    val fu = findService(host, request.uri.path, request.headers.groupBy(_.name()).mapValues(_.last)) match {
+    val fu = ServiceFinderModule.findService(modules.modules.ServiceFinderModule,
+                                             store,
+                                             ctx,
+                                             host,
+                                             request.uri.path,
+                                             request.headers.groupBy(_.name()).mapValues(_.last)) match {
       case Some(service) => {
-        val rawSeq = TargetSetChooserModule.choose(modules.modules.TargetSetChooserModules, ctx, service)
+        val rawSeq = TargetSetChooserModule.choose(modules.modules.TargetSetChooserModule, ctx, service)
         val seq    = rawSeq.flatMap(t => (1 to t.weight).map(_ => t))
         val withApiKeyOrNot =
           ServiceAccessModule.access(modules.modules.ServiceAccessModules, ctx, service)
@@ -219,21 +171,21 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
             .recover {
               case _: akka.pattern.CircuitBreakerOpenException =>
                 request.discardEntityBytes()
-                ErrorRendererModule.render(modules.modules.ErrorRendererModules,
+                ErrorRendererModule.render(modules.modules.ErrorRendererModule,
                                            ctx,
                                            502,
                                            "Circuit breaker is open",
                                            Some(service))
               case _: TimeoutException =>
                 request.discardEntityBytes()
-                ErrorRendererModule.render(modules.modules.ErrorRendererModules,
+                ErrorRendererModule.render(modules.modules.ErrorRendererModule,
                                            ctx,
                                            504,
                                            "Gateway Time-out",
                                            Some(service))
               case e =>
                 request.discardEntityBytes()
-                ErrorRendererModule.render(modules.modules.ErrorRendererModules, ctx, 502, e.getMessage, Some(service))
+                ErrorRendererModule.render(modules.modules.ErrorRendererModule, ctx, 502, e.getMessage, Some(service))
             }
         }
 
@@ -246,20 +198,20 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
                 request.discardEntityBytes()
                 FastFuture.successful(
                   ErrorRendererModule
-                    .render(modules.modules.ErrorRendererModules, ctx, 401, "No ApiKey provided", Some(service))
+                    .render(modules.modules.ErrorRendererModule, ctx, 401, "No ApiKey provided", Some(service))
                 )
               case (PrivateCall, waon @ WithApiKey(_)) => makeTheCall(waon)
               case (PrivateCall, BadApiKey) =>
                 request.discardEntityBytes()
                 FastFuture.successful(
                   ErrorRendererModule
-                    .render(modules.modules.ErrorRendererModules, ctx, 401, "Bad ApiKey provided", Some(service))
+                    .render(modules.modules.ErrorRendererModule, ctx, 401, "Bad ApiKey provided", Some(service))
                 )
               case _ =>
                 request.discardEntityBytes()
                 FastFuture.successful(
                   ErrorRendererModule
-                    .render(modules.modules.ErrorRendererModules, ctx, 401, "No ApiKey provided", Some(service))
+                    .render(modules.modules.ErrorRendererModule, ctx, 401, "No ApiKey provided", Some(service))
                 )
             }
         }
@@ -267,7 +219,7 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], modules: Mo
       case None =>
         request.discardEntityBytes()
         FastFuture.successful(
-          ErrorRendererModule.render(modules.modules.ErrorRendererModules, ctx, 404, "No ApiKey provided", None)
+          ErrorRendererModule.render(modules.modules.ErrorRendererModule, ctx, 404, "No ApiKey provided", None)
         )
     }
     fu.andThen { case _ => startCtx.close() }
