@@ -5,13 +5,18 @@ cd $LOCATION
 
 build_server () { 
   sbt ';clean;compile;test;dist;assembly'
+  rc=$?; if [ $rc != 0 ]; then exit $rc; fi
 }
 
 build_docker () {
   cp $LOCATION/target/scala-2.12/heimdallr.jar $LOCATION/docker/build/
+  cp $LOCATION/target/scala-2.12/heimdallr.jar $LOCATION/docker/graalvm/
   cd $LOCATION/docker/build
   docker build -t heimdallr .
   rm -f $LOCATION/docker/build/heimdallr.jar
+  cd $LOCATION/docker/graalvm
+  docker build -t heimdallr-graalvm .
+  rm -f $LOCATION/docker/graalvm/heimdallr.jar
   cd $LOCATION
 }
 
@@ -25,7 +30,6 @@ case "${1}" in
   all)
     build_server
     build_docker
-    build_docker_dev
     ;;
   server)
     build_server
@@ -39,7 +43,6 @@ case "${1}" in
   *)
     build_server
     build_docker
-    build_docker_dev
 esac
 
 exit ${?}
