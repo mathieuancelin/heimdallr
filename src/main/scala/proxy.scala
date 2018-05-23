@@ -1,28 +1,26 @@
 package io.heimdallr
 
 import java.io.{File, FileInputStream}
-import java.util.concurrent.TimeUnit
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpMethods, HttpRequest, Uri}
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
-import io.heimdallr.api.AdminApi
-import ch.qos.logback.classic.{Level, LoggerContext}
 import ch.qos.logback.classic.joran.JoranConfigurator
+import ch.qos.logback.classic.{Level, LoggerContext}
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigRenderOptions, ConfigResolveOptions}
-import io.circe.{Decoder, Encoder}
+import io.heimdallr.api.AdminApi
 import io.heimdallr.models._
 import io.heimdallr.modules.{DefaultModules, Extensions, Modules, NoExtension}
-import org.slf4j.LoggerFactory
 import io.heimdallr.proxies.HttpProxy
-import io.heimdallr.store.{AtomicStore, Store}
 import io.heimdallr.statsd.Statsd
+import io.heimdallr.store.{AtomicStore, Store}
 import io.heimdallr.util.{Startable, Stoppable}
+import org.slf4j.LoggerFactory
 
-import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 case class Proxy[A, K](config: ProxyConfig[A, K], modules: Modules[A, K])
     extends Startable[Proxy[A, K]]
@@ -110,15 +108,17 @@ object Proxy {
 
   private val logger = LoggerFactory.getLogger("heimdallr")
 
-  def defaultWithConfig(config: ProxyConfig[NoExtension, NoExtension]): Proxy[NoExtension, NoExtension] = withConfig(config, DefaultModules)
-  def defaultFromConfigPath(path: String): Either[ConfigError, Proxy[NoExtension, NoExtension]] = fromConfigPath(path, DefaultModules)
-  def defaultFromConfigFile(file: File): Either[ConfigError, Proxy[NoExtension, NoExtension]] = fromConfigFile(file, DefaultModules)
+  def defaultWithConfig(config: ProxyConfig[NoExtension, NoExtension]): Proxy[NoExtension, NoExtension] =
+    withConfig(config, DefaultModules)
+  def defaultFromConfigPath(path: String): Either[ConfigError, Proxy[NoExtension, NoExtension]] =
+    fromConfigPath(path, DefaultModules)
+  def defaultFromConfigFile(file: File): Either[ConfigError, Proxy[NoExtension, NoExtension]] =
+    fromConfigFile(file, DefaultModules)
 
   def withConfig[A, K](config: ProxyConfig[A, K], modules: Modules[A, K]): Proxy[A, K] =
     new Proxy[A, K](config, modules)
 
-  def fromConfigPath[A, K](path: String,
-                           modules: Modules[A, K]): Either[ConfigError, Proxy[A, K]] = {
+  def fromConfigPath[A, K](path: String, modules: Modules[A, K]): Either[ConfigError, Proxy[A, K]] = {
     if (path.startsWith("http://") || path.startsWith("https://")) {
       logger.info(s"Loading configuration from http resource @ $path")
       val system        = ActorSystem()
