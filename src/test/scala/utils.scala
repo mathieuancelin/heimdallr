@@ -10,14 +10,14 @@ import akka.http.scaladsl.{Http, HttpExt}
 import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import io.heimdallr.models._
-import io.heimdallr.modules.{DefaultModules, Modules, NoExtension}
+import io.heimdallr.modules.default.{DefaultModules, NoExtension}
 import io.heimdallr.util.HttpResponses
+import io.heimdallr.util.Implicits._
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Random, Try}
-import io.heimdallr.util.Implicits._
-import org.slf4j.LoggerFactory
 
 object FutureImplicits {
   implicit class BetterFuture[A](val fu: Future[A]) extends AnyVal {
@@ -67,10 +67,11 @@ trait HeimdallrTestCaseHelper {
       httpPort: Int,
       services: Seq[Service[NoExtension, NoExtension]]
   ): io.heimdallr.Proxy[NoExtension, NoExtension] = {
+    val c = ProxyConfig(api = ApiConfig(enabled = false), http = HttpConfig(httpPort = httpPort), services = services)
     io.heimdallr.Proxy
       .withConfig(
-        ProxyConfig(api = ApiConfig(enabled = false), http = HttpConfig(httpPort = httpPort), services = services),
-        DefaultModules
+        c,
+        DefaultModules(c)
       )
       .startAndWait()
   }

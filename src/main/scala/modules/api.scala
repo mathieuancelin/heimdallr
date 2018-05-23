@@ -3,7 +3,6 @@ package io.heimdallr.modules
 import akka.http.scaladsl.model._
 import io.circe.{Decoder, Encoder, Json}
 import io.heimdallr.models._
-import io.heimdallr.store.Store
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -23,7 +22,6 @@ trait Extensions[A, K] {
 trait Modules[A, B] {
   def modules: ModulesConfig[A, B]
   def extensions: Extensions[A, B]
-  def store: Option[Store[A, B]] = None
 }
 
 trait ModulesConfig[A, K] {
@@ -35,6 +33,44 @@ trait ModulesConfig[A, K] {
   def ErrorRendererModule: ErrorRendererModule[A, K]
   def TargetSetChooserModule: TargetSetChooserModule[A, K]
   def ServiceFinderModule: ServiceFinderModule[A, K]
+  def ServiceStore: ServiceStoreModule[A, K]
+}
+
+trait ServiceStoreModule[A, K] extends Module[A, K] {
+  def getAllServices()(implicit ec: ExecutionContext): Future[Map[String, Seq[Service[A, K]]]]
+  def setAllServices(services: Map[String, Seq[Service[A, K]]])(
+      implicit ec: ExecutionContext
+  ): Future[Map[String, Seq[Service[A, K]]]]
+  def findServiceById(id: String)(implicit ec: ExecutionContext): Future[Option[Service[A, K]]]
+  def addService(service: Service[A, K])(implicit ec: ExecutionContext): Future[Unit]
+  def updateService(id: String, service: Service[A, K])(implicit ec: ExecutionContext): Future[Unit]
+  def removeService(id: String)(implicit ec: ExecutionContext): Future[Unit]
+  def changeDomain(id: String, domain: String)(implicit ec: ExecutionContext): Future[Unit]
+  def addTarget(id: String, target: Target)(implicit ec: ExecutionContext): Future[Unit]
+  def removeTarget(id: String, target: Target)(implicit ec: ExecutionContext): Future[Unit]
+  def addApiKey(serviceId: String, apiKey: ApiKey[K])(implicit ec: ExecutionContext): Future[Unit]
+  def updateApiKey(serviceId: String, apiKey: ApiKey[K])(implicit ec: ExecutionContext): Future[Unit]
+  def removeApiKey(serviceId: String, clientId: String)(implicit ec: ExecutionContext): Future[Unit]
+  def enableApiKey(serviceId: String, clientId: String)(implicit ec: ExecutionContext): Future[Unit]
+  def disabledApiKey(serviceId: String, clientId: String)(implicit ec: ExecutionContext): Future[Unit]
+  def toggleApiKey(serviceId: String, clientId: String)(implicit ec: ExecutionContext): Future[Unit]
+  def resetApiKey(serviceId: String, clientId: String)(implicit ec: ExecutionContext): Future[Unit]
+  def updateClientConfig(serviceId: String, config: ClientConfig)(implicit ec: ExecutionContext): Future[Unit]
+  def addAdditionalHeader(serviceId: String, name: String, value: String)(implicit ec: ExecutionContext): Future[Unit]
+  def removeAdditionalHeader(serviceId: String, name: String)(implicit ec: ExecutionContext): Future[Unit]
+  def updateAdditionalHeader(serviceId: String, name: String, value: String)(
+      implicit ec: ExecutionContext
+  ): Future[Unit]
+  def addMatchingHeader(serviceId: String, name: String, value: String)(implicit ec: ExecutionContext): Future[Unit]
+  def removeMatchingHeader(serviceId: String, name: String)(implicit ec: ExecutionContext): Future[Unit]
+  def updateMatchingHeader(serviceId: String, name: String, value: String)(implicit ec: ExecutionContext): Future[Unit]
+  def updateTargetRoot(serviceId: String, root: String)(implicit ec: ExecutionContext): Future[Unit]
+  def addPublicPattern(serviceId: String, pattern: String)(implicit ec: ExecutionContext): Future[Unit]
+  def removePublicPattern(serviceId: String, pattern: String)(implicit ec: ExecutionContext): Future[Unit]
+  def addPrivatePattern(serviceId: String, pattern: String)(implicit ec: ExecutionContext): Future[Unit]
+  def removePrivatePattern(serviceId: String, pattern: String)(implicit ec: ExecutionContext): Future[Unit]
+  def updateRoot(serviceId: String, root: String)(implicit ec: ExecutionContext): Future[Unit]
+  def removeRoot(serviceId: String)(implicit ec: ExecutionContext): Future[Unit]
 }
 
 // can handle construction mode, maintenance mode
@@ -82,7 +118,7 @@ class CombinedBeforeAfterModule[A, K](modules: Seq[BeforeAfterModule[A, K]]) ext
 }
 
 trait ServiceFinderModule[A, K] extends Module[A, K] {
-  def findService(ctx: ReqContext, store: Store[A, K], host: String, path: Uri.Path, headers: Map[String, HttpHeader])(
+  def findService(ctx: ReqContext, host: String, path: Uri.Path, headers: Map[String, HttpHeader])(
       implicit ec: ExecutionContext
   ): Future[Option[Service[A, K]]]
 }

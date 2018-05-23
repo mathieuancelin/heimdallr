@@ -12,10 +12,10 @@ import ch.qos.logback.classic.{Level, LoggerContext}
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigRenderOptions, ConfigResolveOptions}
 import io.heimdallr.api.AdminApi
 import io.heimdallr.models._
-import io.heimdallr.modules.{DefaultModules, Extensions, Modules, NoExtension}
+import io.heimdallr.modules._
+import io.heimdallr.modules.default._
 import io.heimdallr.proxies.HttpProxy
 import io.heimdallr.statsd.Statsd
-import io.heimdallr.store.{AtomicStore, Store}
 import io.heimdallr.util.{Startable, Stoppable}
 import org.slf4j.LoggerFactory
 
@@ -31,12 +31,8 @@ case class Proxy[A, K](config: ProxyConfig[A, K], modules: Modules[A, K])
   val decoders    = new Decoders[A, K](modules.extensions)
   val commands    = new Commands[A, K](decoders)
   val statsd      = new Statsd[A, K](config, actorSystem)
-  val store: Store[A, K] =
-    modules.store.getOrElse(
-      new AtomicStore[A, K](config.services.groupBy(_.domain), config.state, statsd, encoders, decoders)
-    )
-  val httpProxy = new HttpProxy(config, store, modules, statsd)
-  val adminApi  = new AdminApi[A, K](config, store, statsd, commands, encoders)
+  val httpProxy   = new HttpProxy(config, modules, statsd)
+  val adminApi    = new AdminApi[A, K](config, modules, statsd, commands, encoders)
 
   private def setupLoggers(): Unit = {
     val loggerContext = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
@@ -53,7 +49,6 @@ case class Proxy[A, K](config: ProxyConfig[A, K], modules: Modules[A, K])
 
   override def start(): Proxy[A, K] = {
     setupLoggers()
-    store.start()
     statsd.start()
     httpProxy.start()
     if (config.api.enabled) {
@@ -65,7 +60,6 @@ case class Proxy[A, K](config: ProxyConfig[A, K], modules: Modules[A, K])
   def startAndWait(): Proxy[A, K] = {
     import scala.concurrent.duration._
     setupLoggers()
-    store.start()
     statsd.start()
     httpProxy.start()
     Await.result(httpProxy.boundHttp.future, 60.seconds)
@@ -77,7 +71,6 @@ case class Proxy[A, K](config: ProxyConfig[A, K], modules: Modules[A, K])
   }
 
   override def stop(): Unit = {
-    store.stop()
     statsd.stop()
     httpProxy.stop()
     if (config.api.enabled) {
@@ -96,11 +89,16 @@ case class Proxy[A, K](config: ProxyConfig[A, K], modules: Modules[A, K])
   def updateState(
       f: Seq[Service[A, K]] => Seq[Service[A, K]]
   )(implicit ec: ExecutionContext): Future[Seq[Service[A, K]]] = {
-    store.modify(m => f(m.values.toSeq.flatten).groupBy(_.domain)).map(_.values.toSeq.flatten)
+    for {
+      services <- modules.modules.ServiceStore.getAllServices()
+      res      <- modules.modules.ServiceStore.setAllServices(f(services.values.toSeq.flatten).groupBy(_.domain))
+    } yield {
+      res.values.toSeq.flatten
+    }
   }
 
   def getState()(implicit ec: ExecutionContext): Future[Seq[Service[A, K]]] = {
-    store.get().map(_.values.toSeq.flatten)
+    modules.modules.ServiceStore.getAllServices().map(_.values.toSeq.flatten)
   }
 }
 
@@ -109,16 +107,17 @@ object Proxy {
   private val logger = LoggerFactory.getLogger("heimdallr")
 
   def defaultWithConfig(config: ProxyConfig[NoExtension, NoExtension]): Proxy[NoExtension, NoExtension] =
-    withConfig(config, DefaultModules)
+    withConfig(config, DefaultModules(config))
   def defaultFromConfigPath(path: String): Either[ConfigError, Proxy[NoExtension, NoExtension]] =
-    fromConfigPath(path, DefaultModules)
+    fromConfigPath(path, DefaultModules.apply)
   def defaultFromConfigFile(file: File): Either[ConfigError, Proxy[NoExtension, NoExtension]] =
-    fromConfigFile(file, DefaultModules)
+    fromConfigFile(file, DefaultModules.apply)
 
   def withConfig[A, K](config: ProxyConfig[A, K], modules: Modules[A, K]): Proxy[A, K] =
     new Proxy[A, K](config, modules)
 
-  def fromConfigPath[A, K](path: String, modules: Modules[A, K]): Either[ConfigError, Proxy[A, K]] = {
+  def fromConfigPath[A, K](path: String,
+                           _modules: ProxyConfig[A, K] => Modules[A, K]): Either[ConfigError, Proxy[A, K]] = {
     if (path.startsWith("http://") || path.startsWith("https://")) {
       logger.info(s"Loading configuration from http resource @ $path")
       val system        = ActorSystem()
@@ -143,20 +142,21 @@ object Proxy {
       val either = io.circe.parser.parse(jsonConf) match {
         case Left(e) => Left(ConfigError(e.message))
         case Right(json) =>
-          val decoders = new Decoders[A, K](modules.extensions)
+          val decoders = new Decoders[A, K](_modules(ProxyConfig()).extensions) // ARF !!!
           decoders.ProxyConfigDecoder.decodeJson(json) match {
-            case Right(config) => Right(new Proxy(config, modules))
+            case Right(config) => Right(new Proxy(config, _modules(config)))
             case Left(e)       => Left(ConfigError(e.message))
           }
       }
       system.terminate()
       either
     } else {
-      fromConfigFile(new File(path), modules)
+      fromConfigFile(new File(path), _modules)
     }
   }
 
-  def fromConfigFile[A, K](file: File, modules: Modules[A, K]): Either[ConfigError, Proxy[A, K]] = {
+  def fromConfigFile[A, K](file: File,
+                           _modules: ProxyConfig[A, K] => Modules[A, K]): Either[ConfigError, Proxy[A, K]] = {
     logger.info(s"Loading configuration from file @ ${file.toPath.toString}")
     val withLoader = ConfigParseOptions.defaults.setClassLoader(getClass.getClassLoader)
     val conf = ConfigFactory
@@ -168,9 +168,9 @@ object Proxy {
     io.circe.parser.parse(jsonConf) match {
       case Left(e) => Left(ConfigError(e.message))
       case Right(json) =>
-        val decoders = new Decoders[A, K](modules.extensions)
+        val decoders = new Decoders[A, K](_modules(ProxyConfig()).extensions) // ARF !!!
         decoders.ProxyConfigDecoder.decodeJson(json) match {
-          case Right(config) => Right(new Proxy(config, modules))
+          case Right(config) => Right(new Proxy(config, _modules(config)))
           case Left(e)       => Left(ConfigError(e.message))
         }
     }

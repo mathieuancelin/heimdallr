@@ -8,7 +8,6 @@ import io.circe.Decoder.Result
 import io.circe._
 import io.circe.generic.semiauto._
 import io.heimdallr.modules._
-import io.heimdallr.store.Store
 import io.heimdallr.util.IdGenerator
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -180,23 +179,19 @@ case class ConfigError(message: String)
 
 trait Command[A, K] {
   def command: String
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]]
-  def applyModification(store: Store[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
-    store.modify(s => modify(s.values.flatten.toSeq).groupBy(_.domain)).map { r =>
-      Json.obj("result" -> Json.fromString("command applied"))
-    }
-  }
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json]
 }
 
 case class NothingCommand[A, K](command: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = state
+  override def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(
+      implicit ec: ExecutionContext
+  ): Future[Json] = FastFuture.successful(Json.obj())
 }
 
 case class GetStateCommand[A, K](command: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = state
-  override def applyModification(store: Store[A, K],
-                                 encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
-    store.get().map { map =>
+  override def apply(store: ServiceStoreModule[A, K],
+                     encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.getAllServices().map { map =>
       val seq = map.values.flatten.toSeq
       Json.obj("state" -> encoders.SeqOfServiceEncoder(seq))
     }
@@ -204,397 +199,191 @@ case class GetStateCommand[A, K](command: String) extends Command[A, K] {
 }
 
 case class GetServiceCommand[A, K](command: String, serviceId: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = state
-  override def applyModification(store: Store[A, K],
-                                 encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
-    store.get().map { map =>
-      map.values.flatten.toSeq.find(_.id == serviceId) match {
-        case Some(service) => encoders.ServiceEncoder(service)
-        case None          => Json.obj("error" -> Json.fromString("not found"))
-      }
+  override def apply(store: ServiceStoreModule[A, K],
+                     encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.findServiceById(serviceId) map {
+      case Some(service) => encoders.ServiceEncoder(service)
+      case None          => Json.obj("error" -> Json.fromString("not found"))
     }
-  }
-}
-
-case class GetMetricsCommand[A, K](command: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = state
-  override def applyModification(store: Store[A, K],
-                                 encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
-    FastFuture.successful(Json.obj("metrics" -> Json.obj()))
   }
 }
 
 case class LoadStateCommand[A, K](command: String, serviceId: String, services: Seq[Service[A, K]])
     extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = services
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.setAllServices(services.groupBy(_.domain)).map(_ => Json.obj("result" -> Json.fromString("command applied")))
+  }
 }
 
 case class AddServiceCommand[A, K](command: String, service: Service[A, K]) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = state :+ service
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] =
+    store.addService(service).map(_ => Json.obj("result" -> Json.fromString("command applied")))
 }
 
 case class UpdateServiceCommand[A, K](command: String, serviceId: String, updatedService: Service[A, K])
     extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        updatedService.copy(id = serviceId)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.updateService(serviceId, updatedService).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class RemoveServiceCommand[A, K](command: String, serviceId: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = state.filterNot(_.id == serviceId)
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.removeService(serviceId).map(_ => Json.obj("result" -> Json.fromString("command applied")))
+  }
 }
 
 case class ChangeDomainCommand[A, K](command: String, serviceId: String, domain: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(domain = domain)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.changeDomain(serviceId, domain).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class AddTargetCommand[A, K](command: String, serviceId: String, target: Target) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(targets = service.targets :+ target)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.addTarget(serviceId, target).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class RemoveTargetCommand[A, K](command: String, serviceId: String, target: Target) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(targets = service.targets.filterNot(_ == target))
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.removeTarget(serviceId, target).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class AddApiKeyCommand[A, K](command: String, serviceId: String, apiKey: ApiKey[K]) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(apiKeys = service.apiKeys :+ apiKey)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.addApiKey(serviceId, apiKey).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class UpdateApiKeyCommand[A, K](command: String, serviceId: String, apiKey: ApiKey[K]) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(apiKeys = service.apiKeys.filterNot(_.clientId == apiKey.clientId) :+ apiKey)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.updateApiKey(serviceId, apiKey).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class RemoveApiKeyCommand[A, K](command: String, serviceId: String, apiKey: ApiKey[K]) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(apiKeys = service.apiKeys.filterNot(_.clientId == apiKey.clientId))
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.removeApiKey(serviceId, apiKey.clientId).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class EnableApiKeyCommand[A, K](command: String, serviceId: String, clientId: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        val opt = service.apiKeys.find(_.clientId == clientId).map(ak => ak.copy(enabled = true))
-        service.copy(apiKeys = service.apiKeys.filterNot(_.clientId == clientId) ++ opt)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.enableApiKey(serviceId, clientId).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class DisabledApiKeyCommand[A, K](command: String, serviceId: String, clientId: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        val opt = service.apiKeys.find(_.clientId == clientId).map(ak => ak.copy(enabled = false))
-        service.copy(apiKeys = service.apiKeys.filterNot(_.clientId == clientId) ++ opt)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.disabledApiKey(serviceId, clientId).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class ToggleApiKeyCommand[A, K](command: String, serviceId: String, clientId: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        val opt = service.apiKeys.find(_.clientId == clientId).map(ak => ak.copy(enabled = !ak.enabled))
-        service.copy(apiKeys = service.apiKeys.filterNot(_.clientId == clientId) ++ opt)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.toggleApiKey(serviceId, clientId).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class ResetApiKeyCommand[A, K](command: String, serviceId: String, clientId: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        val opt = service.apiKeys.find(_.clientId == clientId).map(ak => ak.copy(clientSecret = IdGenerator.token))
-        service.copy(apiKeys = service.apiKeys.filterNot(_.clientId == clientId) ++ opt)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.resetApiKey(serviceId, clientId).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class UpdateClientConfigCommand[A, K](command: String, serviceId: String, config: ClientConfig)
     extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(clientConfig = config)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.updateClientConfig(serviceId, config).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class AddAdditionalHeaderCommand[A, K](command: String, serviceId: String, name: String, value: String)
     extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(additionalHeaders = service.additionalHeaders + (name -> value))
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.addAdditionalHeader(serviceId, name, value).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class RemoveAdditionalHeaderCommand[A, K](command: String, serviceId: String, name: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(additionalHeaders = service.additionalHeaders - name)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.removeAdditionalHeader(serviceId, name).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class UpdateAdditionalHeaderCommand[A, K](command: String, serviceId: String, name: String, value: String)
     extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(additionalHeaders = service.additionalHeaders + (name -> value))
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store
+      .updateAdditionalHeader(serviceId, name, value)
+      .map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class AddMatchingHeaderCommand[A, K](command: String, serviceId: String, name: String, value: String)
     extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(matchingHeaders = service.matchingHeaders + (name -> value))
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.addMatchingHeader(serviceId, name, value).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class RemoveMatchingHeaderCommand[A, K](command: String, serviceId: String, name: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(matchingHeaders = service.matchingHeaders - name)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.removeMatchingHeader(serviceId, name).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class UpdateMatchingHeaderCommand[A, K](command: String, serviceId: String, name: String, value: String)
     extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(matchingHeaders = service.matchingHeaders + (name -> value))
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store
+      .updateMatchingHeader(serviceId, name, value)
+      .map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class UpdateTargetRootCommand[A, K](command: String, serviceId: String, root: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(targetRoot = root)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.updateTargetRoot(serviceId, root).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class AddPublicPatternCommand[A, K](command: String, serviceId: String, pattern: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(publicPatterns = service.publicPatterns + pattern)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.addPublicPattern(serviceId, pattern).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class RemovePublicPatternCommand[A, K](command: String, serviceId: String, pattern: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(publicPatterns = service.publicPatterns.filterNot(_ == pattern))
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.removePublicPattern(serviceId, pattern).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class AddPrivatePatternCommand[A, K](command: String, serviceId: String, pattern: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(privatePatterns = service.privatePatterns + pattern)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.addPrivatePattern(serviceId, pattern).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class RemovePrivatePatternCommand[A, K](command: String, serviceId: String, pattern: String)
     extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(privatePatterns = service.privatePatterns.filterNot(_ == pattern))
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.removePrivatePattern(serviceId, pattern).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class UpdateRootCommand[A, K](command: String, serviceId: String, root: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(root = Some(root))
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.updateRoot(serviceId, root).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
 case class RemoveRootCommand[A, K](command: String, serviceId: String) extends Command[A, K] {
-  def modify(state: Seq[Service[A, K]]): Seq[Service[A, K]] = {
-    state
-      .find(_.id == serviceId)
-      .map { service =>
-        // Update here
-        service.copy(root = None)
-      }
-      .map { newService =>
-        state.filterNot(_.id == serviceId) :+ newService
-      } getOrElse state
+  def apply(store: ServiceStoreModule[A, K], encoders: Encoders[A, K])(implicit ec: ExecutionContext): Future[Json] = {
+    store.removeRoot(serviceId).map(_ => Json.obj("result" -> Json.fromString("command applied")))
   }
 }
 
@@ -609,7 +398,6 @@ class Commands[A, K](decoders: Decoders[A, K]) {
   val LoadStateCommandDecoder: Decoder[LoadStateCommand[A, K]]           = deriveDecoder[LoadStateCommand[A, K]]
   val GetStateCommandDecoder: Decoder[GetStateCommand[A, K]]             = deriveDecoder[GetStateCommand[A, K]]
   val GetServiceCommand: Decoder[GetServiceCommand[A, K]]                = deriveDecoder[GetServiceCommand[A, K]]
-  val GetMetricsCommandDecoder: Decoder[GetMetricsCommand[A, K]]         = deriveDecoder[GetMetricsCommand[A, K]]
   val ChangeDomainCommandDecoder: Decoder[ChangeDomainCommand[A, K]]     = deriveDecoder[ChangeDomainCommand[A, K]]
   val AddTargetCommandDecoder: Decoder[AddTargetCommand[A, K]]           = deriveDecoder[AddTargetCommand[A, K]]
   val RemoveTargetCommandDecoder: Decoder[RemoveTargetCommand[A, K]]     = deriveDecoder[RemoveTargetCommand[A, K]]
@@ -656,7 +444,6 @@ class Commands[A, K](decoders: Decoders[A, K]) {
       case "LoadStateCommand"              => LoadStateCommandDecoder.decodeJson(json)
       case "GetStateCommand"               => GetStateCommandDecoder.decodeJson(json)
       case "GetServiceCommand"             => GetServiceCommand.decodeJson(json)
-      case "GetMetricsCommand"             => GetMetricsCommandDecoder.decodeJson(json)
       case "ChangeDomainCommand"           => ChangeDomainCommandDecoder.decodeJson(json)
       case "AddTargetCommand"              => AddTargetCommandDecoder.decodeJson(json)
       case "RemoveTargetCommand"           => RemoveTargetCommandDecoder.decodeJson(json)

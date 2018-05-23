@@ -36,7 +36,7 @@ libraryDependencies ++= {
   )
 }
 
-javaAgents += "org.mortbay.jetty.alpn" % "jetty-alpn-agent" % "2.0.6" % "runtime"
+javaAgents += "org.mortbay.jetty.alpn" % "jetty-alpn-agent" % "2.0.7" % "runtime"
 
 mainClass in Compile := Some("io.heimdallr.Main")
 mainClass in reStart := Some("io.heimdallr.Main")

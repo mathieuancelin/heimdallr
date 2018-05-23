@@ -10,21 +10,20 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.model.Uri.Authority
 import akka.http.scaladsl.model.headers.Host
 import akka.http.scaladsl.model.ws.UpgradeToWebSocket
-import akka.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
 import akka.http.scaladsl.util.FastFuture
 import akka.pattern.CircuitBreaker
 import akka.stream.ActorMaterializer
 import io.heimdallr.models.{WithApiKeyOrNot, _}
 import io.heimdallr.modules._
 import io.heimdallr.statsd._
-import io.heimdallr.store.Store
 import io.heimdallr.util._
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{Future, Promise, TimeoutException}
 import scala.util.{Failure, Success}
 
-class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], mods: Modules[A, K], statsd: Statsd[A, K])
+class HttpProxy[A, K](config: ProxyConfig[A, K], mods: Modules[A, K], statsd: Statsd[A, K])
     extends Startable[HttpProxy[A, K]]
     with Stoppable[HttpProxy[A, K]] {
 
@@ -73,7 +72,6 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], store: Store[A, K], mods: Modul
 
     val host = extractHost(request)
     val fu = mods.modules.ServiceFinderModule.findService(ctx,
-                                                          store,
                                                           host,
                                                           request.uri.path,
                                                           request.headers.groupBy(_.name()).mapValues(_.last)) flatMap {

@@ -9,8 +9,7 @@ import akka.stream.ActorMaterializer
 import akka.util.ByteString
 import io.circe.Json
 import io.heimdallr.models._
-import io.heimdallr.modules.Extensions
-import io.heimdallr.store.Store
+import io.heimdallr.modules.{Extensions, Modules}
 import io.heimdallr.statsd._
 import io.heimdallr.util.HttpResponses._
 import io.heimdallr.util.{HttpsSupport, Startable, Stoppable}
@@ -21,11 +20,11 @@ import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
 class AdminApi[A, K](config: ProxyConfig[A, K],
-                     store: Store[A, K],
+                     mods: Modules[A, K],
                      metrics: Statsd[A, K],
                      commands: Commands[A, K],
-                     encoders: Encoders[A, K])
-    extends Startable[AdminApi[A, K]]
+                     encoders: Encoders[A, K],
+) extends Startable[AdminApi[A, K]]
     with Stoppable[AdminApi[A, K]] {
 
   implicit val system       = ActorSystem()
@@ -41,17 +40,15 @@ class AdminApi[A, K](config: ProxyConfig[A, K],
   def handler(request: HttpRequest): Future[HttpResponse] = {
     (request.method, request.uri.path) match {
       case (HttpMethods.GET, Uri.Path("/api/services")) => {
-        store.get().map { map =>
+        mods.modules.ServiceStore.getAllServices().map { map =>
           Ok(encoders.SeqOfServiceEncoder(map.values.flatten.toSeq))
         }
       }
       case (HttpMethods.GET, path) if path.startsWith(Uri.Path("/api/services/")) => {
         val serviceId = path.toString.replace("/api/services/", "")
-        store.get().map { map =>
-          map.values.flatten.toSeq.find(_.id == serviceId) match {
-            case Some(service) => Ok(encoders.ServiceEncoder(service))
-            case None          => NotFound(s"Service with id $serviceId does not exist")
-          }
+        mods.modules.ServiceStore.findServiceById(serviceId).map {
+          case Some(service) => Ok(encoders.ServiceEncoder(service))
+          case None          => NotFound(s"Service with id $serviceId does not exist")
         }
       }
       case (HttpMethods.POST, Uri.Path("/api/_command")) =>
@@ -63,7 +60,7 @@ class AdminApi[A, K](config: ProxyConfig[A, K],
               logger.info(s"received command: ${json.noSpaces}")
               commands.decode(json.hcursor.downField("command").as[String].getOrElse("none"), json) match {
                 case Left(_)        => BadRequest("Error while parsing command").asFuture
-                case Right(command) => command.applyModification(store, encoders).map(Ok(_))
+                case Right(command) => command(mods.modules.ServiceStore, encoders).map(Ok(_))
               }
           }
         }

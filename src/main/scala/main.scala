@@ -3,7 +3,7 @@ package io.heimdallr
 import java.io.File
 
 import io.heimdallr.models.{ApiKey, ProxyConfig, Service, Target}
-import io.heimdallr.modules.{DefaultModules, NoExtension}
+import io.heimdallr.modules.default.{DefaultModules, NoExtension}
 import org.slf4j.LoggerFactory
 
 object Main {
@@ -94,12 +94,12 @@ object Main {
       .map(
         _ =>
           Proxy
-            .withConfig[NoExtension, NoExtension](demoConfig, DefaultModules)
+            .withConfig[NoExtension, NoExtension](demoConfig, DefaultModules(demoConfig))
             .start()
             .stopOnShutdown()
       )
       .orElse(args.find(_.startsWith("--proxy.config=")).map(_.replace("--proxy.config=", "")).map { path =>
-        Proxy.fromConfigPath[NoExtension, NoExtension](path, DefaultModules) match {
+        Proxy.fromConfigPath[NoExtension, NoExtension](path, DefaultModules.apply) match {
           case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
           case Right(proxy) => {
             val configFile   = new File(path)
@@ -109,8 +109,9 @@ object Main {
 
             watchFile(configFile) { f =>
               Proxy.readProxyConfigFromFile(configFile, true, NoExtension) match {
-                case Left(e)       => logger.error(s"Error while loading config file @ $path: $e")
-                case Right(config) => startedProxy.updateState(_ => config.services)
+                case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
+                case Right(config) =>
+                  startedProxy.updateState(_ => config.services)
               }
             }
           }
@@ -118,7 +119,7 @@ object Main {
       })
       .getOrElse {
         val path = "./heimdallr.conf"
-        Proxy.fromConfigPath[NoExtension, NoExtension](path, DefaultModules) match {
+        Proxy.fromConfigPath[NoExtension, NoExtension](path, DefaultModules.apply) match {
           case Left(e) => logger.error(s"Error while loading config file @ $path: $e")
           case Right(proxy) => {
             val configFile   = new File(path)
