@@ -86,7 +86,7 @@ configApp.listen(configPort, () => console.log(`Config server listening on port 
 
 setTimeout(() => {
   console.log(`java -jar target/scala-2.12/heimdallr.jar --proxy.config.url=http://127.0.0.1:${configPort}/heimdallr.json`)
-  console.log(`wrk -t6 -c600 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8091/`)
+  console.log(`wrk -t40 -c800 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8091/`)
 }, 5000);
 
 function exitHandler(options, err) {
