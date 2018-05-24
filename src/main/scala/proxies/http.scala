@@ -135,24 +135,28 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], mods: Modules[A, K], statsd: St
                     }
                     case None => {
                       val callStart = System.currentTimeMillis()
-                      circuitBreaker.withCircuitBreaker(http.singleRequest(proxyRequest)).flatMap { resp =>
-                        mods.modules.HeadersOutTransformationModule
-                          .transform(
-                            ctx,
-                            host,
-                            service,
-                            target,
-                            waon,
-                            System.currentTimeMillis() - start,
-                            System.currentTimeMillis() - callStart,
-                            resp.headers.toList
-                          )
-                          .map { headers =>
-                            resp.copy(
-                              headers = headers
+                      circuitBreaker
+                        .withCircuitBreaker(http.singleRequest(proxyRequest).andThen {
+                          case Failure(e) => logger.error("Http call failure handled by CircuitBreaker", e)
+                        })
+                        .flatMap { resp =>
+                          mods.modules.HeadersOutTransformationModule
+                            .transform(
+                              ctx,
+                              host,
+                              service,
+                              target,
+                              waon,
+                              System.currentTimeMillis() - start,
+                              System.currentTimeMillis() - callStart,
+                              resp.headers.toList
                             )
-                          }
-                      } andThen {
+                            .map { headers =>
+                              resp.copy(
+                                headers = headers
+                              )
+                            }
+                        } andThen {
                         case Success(resp) =>
                           mods.modules.BeforeAfterModule.afterRequestSuccess(ctx)
                           if (logger.isInfoEnabled) {

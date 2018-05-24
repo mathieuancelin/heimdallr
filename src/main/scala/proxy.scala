@@ -200,4 +200,24 @@ object Proxy {
         }
     }
   }
+
+  def readProxyConfigFromString[A, K](content: String,
+                                    extensions: Extensions[A, K]): Either[ConfigError, ProxyConfig[A, K]] = {
+    val withLoader = ConfigParseOptions.defaults.setClassLoader(getClass.getClassLoader)
+    val conf = ConfigFactory
+      .systemProperties()
+      .withFallback(ConfigFactory.systemEnvironment())
+      .withFallback(ConfigFactory.parseString(content, withLoader))
+      .resolve(ConfigResolveOptions.defaults)
+    val jsonConf = conf.root().render(ConfigRenderOptions.concise())
+    io.circe.parser.parse(jsonConf) match {
+      case Left(e) => Left(ConfigError(e.message))
+      case Right(json) =>
+        val decoders = new Decoders[A, K](extensions)
+        decoders.ProxyConfigDecoder.decodeJson(json) match {
+          case Right(config) => Right(config)
+          case Left(e)       => Left(ConfigError(e.message))
+        }
+    }
+  }
 }

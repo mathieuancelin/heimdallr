@@ -8,6 +8,6 @@ addSbtPlugin("com.lightbend.sbt" % "sbt-javaagent" % "0.1.4")
 
 addSbtPlugin("io.get-coursier" % "sbt-coursier" % "1.0.1")
 
-addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.12")
+addSbtPlugin("com.lucidchart" % "sbt-scalafmt" % "1.15")
 
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.3.4")
