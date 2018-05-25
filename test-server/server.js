@@ -78,7 +78,7 @@ configApp.listen(configPort, () => {
 
 setTimeout(() => {
   console.log('\nStarting warmup load test')
-  const wrk = exec(`wrk2 -R 8000 -t6 -c600 -d20s -H "Host: test.foo.bar" --latency http://127.0.0.1:8091/`);
+  const wrk = exec(`wrk2 -R 1000 -t6 -c200 -d40s -H "Host: test.foo.bar" --latency http://127.0.0.1:8091/`);
   processes.push(wrk);
   wrk.on('exit', (e) => {
     console.log('Starting actual load test')
