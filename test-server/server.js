@@ -69,25 +69,32 @@ configApp.get('/heimdallr.json', (req, res) => {
     "statsd": null  
   });
 });
-configApp.listen(configPort, () => console.log(`Config server listening on port ${configPort}!`));
 
-// {
-//   const heimdallr = exec(`java -jar target/scala-2.12/heimdallr.jar --proxy.config.url=http://127.0.0.1:${configPort}/heimdallr.json`);
-//   processes.push(heimdallr);
-// }
-// 
-// setTimeout(() => {
-//   const wrk = exec(`wrk -t6 -c600 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8091/`);
-//   wrk.on('close', (code, signal) => {
-//     console.log(`wrk terminated due to receipt of signal ${signal}`);
-//     process.exit();
-//   });
-// }, 5000)
+configApp.listen(configPort, () => {
+  console.log(`Config server listening on port ${configPort}!`);
+  const heimdallr = exec(`java -jar ../target/scala-2.12/heimdallr.jar --proxy.config.url=http://127.0.0.1:${configPort}/heimdallr.json`);
+  processes.push(heimdallr);
+});
 
 setTimeout(() => {
-  console.log(`java -jar target/scala-2.12/heimdallr.jar --proxy.config.url=http://127.0.0.1:${configPort}/heimdallr.json`)
-  console.log(`wrk -t40 -c800 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8091/`)
-}, 5000);
+  console.log('\nStarting warmup load test')
+  const wrk = exec(`wrk2 -R 8000 -t6 -c600 -d20s -H "Host: test.foo.bar" --latency http://127.0.0.1:8091/`);
+  processes.push(wrk);
+  wrk.on('exit', (e) => {
+    console.log('Starting actual load test')
+    const wrkLoad = exec(`wrk2 -R 8000 -t80 -c800 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8091/`);
+    processes.push(wrkLoad);
+    wrkLoad.stdout.on('data', (chunk) => {
+      console.log(`[wrk-load] ${chunk}`);
+    });
+    wrkLoad.stderr.on('data', (chunk) => {
+      console.log(`[wrk-load-err] ${chunk}`);
+    });
+    wrkLoad.on('exit', (e) => {
+      process.exit();
+    });
+  });
+}, 6000)
 
 function exitHandler(options, err) {
   processes.forEach(a => a.kill());
@@ -100,3 +107,6 @@ process.on('SIGINT', exitHandler.bind(null, {exit:true}));
 process.on('SIGUSR1', exitHandler.bind(null, {exit:true}));
 process.on('SIGUSR2', exitHandler.bind(null, {exit:true}));
 process.on('uncaughtException', exitHandler.bind(null, {exit:true}));
+
+// java -jar target/scala-2.12/heimdallr.jar --proxy.config.url=http://127.0.0.1:${configPort}/heimdallr.json
+// wrk -t40 -c800 -d60s -H "Host: test.foo.bar" --latency http://127.0.0.1:8091/
