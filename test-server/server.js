@@ -4,6 +4,9 @@ const _ = require('lodash');
 const argv = require('minimist')(process.argv.slice(2));
 const from = argv.fromPort;
 const to = argv.toPort + 1;
+const docker = (argv.docker === 'true') || false;
+const graalvm = (argv.graalvm === 'true') || false;
+const ipAddress = argv.ipAddress || '127.0.0.1';
 const processes = [];
 
 _.range(from, to).forEach((port, idx) => {
@@ -40,7 +43,7 @@ configApp.get('/heimdallr.json', (req, res) => {
         "domain" : "test.foo.bar",
         "targets" : _.range(from, to).map(port => {
           return {
-            "url" : `http://127.0.0.1:${port}`,
+            "url" : `http://${ipAddress}:${port}`,
             "weight" : 1,
             "protocol" : "HTTP/1.1"
           };
@@ -72,8 +75,24 @@ configApp.get('/heimdallr.json', (req, res) => {
 
 configApp.listen(configPort, () => {
   console.log(`Config server listening on port ${configPort}!`);
-  const heimdallr = exec(`java -jar ../target/scala-2.12/heimdallr.jar --proxy.config.url=http://127.0.0.1:${configPort}/heimdallr.json`);
-  processes.push(heimdallr);
+  if (docker) {
+    if (graalvm) {
+      const commandLine = `docker run -p "8091:8091" heimdallr-graalvm --proxy.config.url=http://${ipAddress}:${configPort}/heimdallr.json`;
+      console.log(commandLine);   
+      const heimdallr = exec(commandLine);
+      processes.push(heimdallr);
+    } else {
+      const commandLine = `docker run -p "8091:8091" heimdallr-classic --proxy.config.url=http://${ipAddress}:${configPort}/heimdallr.json`;
+      console.log(commandLine);
+      const heimdallr = exec(commandLine);
+      processes.push(heimdallr);
+    }
+  } else {
+    const commandLine = `java -jar ../target/scala-2.12/heimdallr.jar --proxy.config.url=http://${ipAddress}:${configPort}/heimdallr.json`;
+    console.log(commandLine);
+    const heimdallr = exec(commandLine);
+    processes.push(heimdallr);
+  }
 });
 
 setTimeout(() => {
@@ -96,7 +115,7 @@ setTimeout(() => {
       }, 2000)
     });
   });
-}, 6000)
+}, 20000)
 
 function exitHandler(options, err) {
   processes.forEach(a => a.kill());

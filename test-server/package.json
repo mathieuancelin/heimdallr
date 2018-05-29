@@ -4,7 +4,9 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "start": "node server.js --fromPort=8040 --toPort=8079 --port=8100"
+    "start": "node server.js --fromPort=8040 --toPort=8079 --port=8100",
+    "start-docker": "node server.js --fromPort=8040 --toPort=8079 --port=8100 --docker=true",
+    "start-graalvm": "node server.js --fromPort=8040 --toPort=8079 --port=8100 --docker=true --graalvm=true"
   },
   "dependencies": {
     "express": "^4.16.3",

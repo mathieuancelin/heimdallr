@@ -11,14 +11,15 @@ WORKDIR /heimdallr
 
 COPY . /heimdallr
 
-RUN apt-get update -y \
-  && apt-get install -y curl bash \
-  && chown -R heimdallr:heimdallr /heimdallr
+RUN chown -R heimdallr:heimdallr /heimdallr
 
 VOLUME /heimdallr
 
 ENTRYPOINT ["./entrypoint.sh"]
 
-EXPOSE 8080
+EXPOSE 8091
+EXPOSE 8443
+EXPOSE 9081
+EXPOSE 9443
 
 CMD [""]
