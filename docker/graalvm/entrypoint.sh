@@ -1,2 +1,2 @@
 #!/bin/sh
-java -jar heimdallr.jar "$@"
+/heimdallr/graalvm/bin/java -jar heimdallr.jar "$@"
