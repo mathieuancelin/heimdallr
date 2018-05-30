@@ -6,6 +6,10 @@ WORKDIR /heimdallr
 
 COPY . /heimdallr
 
+RUN apt-get update -y \
+  && apt-get install -y curl bash wget \
+  && wget https://api.bintray.com/content/mathieuancelin/heimdallr/heimdallr.jar/snapshot/heimdallr.jar 
+
 EXPOSE 8091
 EXPOSE 8443
 EXPOSE 9081
