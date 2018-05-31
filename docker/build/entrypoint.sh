@@ -1,2 +1,2 @@
 #!/bin/sh
-java -jar heimdallr.jar "$@"
+java  "@JAVA_OPTS" -jar heimdallr.jar "$@"
