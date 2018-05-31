@@ -99,20 +99,24 @@ object Main {
 
     def fetch(url: String): ProxyConfig[NoExtension, NoExtension] = {
       import scala.concurrent.duration._
-      val system = ActorSystem("config-fetch-system")
-      val http = Http.apply()(system)
+      val system       = ActorSystem("config-fetch-system")
+      val http         = Http.apply()(system)
       implicit val mat = ActorMaterializer.create(system)
-      val fu = http.singleRequest(HttpRequest(
-        uri = Uri(url),
-        method = HttpMethods.GET
-      )).flatMap { resp =>
-        resp.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { body =>
-          Proxy.readProxyConfigFromString(body.utf8String, NoExtension) match {
-            case Left(e) => throw new RuntimeException(s"Error while loading config from url @ $url: $e")
-            case Right(config) => config
+      val fu = http
+        .singleRequest(
+          HttpRequest(
+            uri = Uri(url),
+            method = HttpMethods.GET
+          )
+        )
+        .flatMap { resp =>
+          resp.entity.dataBytes.runFold(ByteString.empty)(_ ++ _).map { body =>
+            Proxy.readProxyConfigFromString(body.utf8String, NoExtension) match {
+              case Left(e)       => throw new RuntimeException(s"Error while loading config from url @ $url: $e")
+              case Right(config) => config
+            }
           }
         }
-      }
       val config = Await.result(fu, 10.seconds)
       system.terminate()
       config

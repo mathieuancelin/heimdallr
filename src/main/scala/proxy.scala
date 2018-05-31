@@ -202,7 +202,7 @@ object Proxy {
   }
 
   def readProxyConfigFromString[A, K](content: String,
-                                    extensions: Extensions[A, K]): Either[ConfigError, ProxyConfig[A, K]] = {
+                                      extensions: Extensions[A, K]): Either[ConfigError, ProxyConfig[A, K]] = {
     val withLoader = ConfigParseOptions.defaults.setClassLoader(getClass.getClassLoader)
     val conf = ConfigFactory
       .systemProperties()
