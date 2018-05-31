@@ -1,6 +1,7 @@
 package io.heimdallr.modules
 
 import akka.http.scaladsl.model.HttpRequest
+import org.joda.time.DateTime
 
 class TypedKey[A] private (val displayName: Option[String]) {
   def bindValue(value: A): TypedEntry[A] = TypedEntry(this, value)
@@ -49,4 +50,4 @@ class DefaultTypedMap(m: scala.collection.mutable.Map[TypedKey[_], Any]) extends
   override def toString: String = m.mkString("{", ", ", "}")
 }
 
-case class ReqContext(reqId: String, args: TypedMap, request: HttpRequest)
+case class ReqContext(reqId: String, timestamp: DateTime, args: TypedMap, request: HttpRequest)

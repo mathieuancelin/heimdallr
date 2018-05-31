@@ -18,6 +18,7 @@ import io.heimdallr.models.{WithApiKeyOrNot, _}
 import io.heimdallr.modules._
 import io.heimdallr.statsd._
 import io.heimdallr.util._
+import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{Future, Promise, TimeoutException}
@@ -66,7 +67,7 @@ class HttpProxy[A, K](config: ProxyConfig[A, K], mods: Modules[A, K], statsd: St
     val start     = System.currentTimeMillis()
     val startCtx  = statsd.timeCtx("proxy-request")
     val requestId = UUID.randomUUID().toString
-    val ctx       = ReqContext(requestId, TypedMap.empty, request)
+    val ctx       = ReqContext(requestId, DateTime.now(), TypedMap.empty, request)
 
     mods.modules.BeforeAfterModule.beforeRequest(ctx)
 

@@ -19,7 +19,6 @@ import io.heimdallr.models._
 import io.heimdallr.modules.{Extensions, _}
 import io.heimdallr.util.Implicits._
 import io.heimdallr.util.{IdGenerator, RegexPool, Startable, Stoppable}
-import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
@@ -559,7 +558,7 @@ class DefaultHeadersInTransformationModule extends HeadersInTransformationModule
       headers.filterNot(_.name() == authHeaderName) ++
       service.additionalHeaders.toList.map(t => RawHeader(t._1, t._2)) :+
       RawHeader("X-Request-Id", ctx.reqId) :+
-      RawHeader("X-Request-Timestamp", DateTime.now().toString("yyyy-MM-dd'T'HH:mm:ss.SSSZZ")) :+
+      RawHeader("X-Request-Timestamp", ctx.timestamp.toString("yyyy-MM-dd'T'HH:mm:ss.SSSZZ")) :+
       RawHeader("X-Fowarded-Host", host) :+
       RawHeader("X-Fowarded-Scheme", ctx.request.uri.scheme)
     ).asFuture
@@ -579,6 +578,8 @@ class DefaultHeadersOutTransformationModule extends HeadersOutTransformationModu
                          targetLatency: Long,
                          headers: List[HttpHeader])(implicit ec: ExecutionContext): Future[List[HttpHeader]] = {
     (headers :+
+    RawHeader("X-Request-Id", ctx.reqId) :+
+    RawHeader("X-Request-Timestamp", ctx.timestamp.toString("yyyy-MM-dd'T'HH:mm:ss.SSSZZ")) :+
     RawHeader("X-Proxy-Latency", proxyLatency.toString) :+
     RawHeader("X-Target-Latency", targetLatency.toString)).asFuture
   }
