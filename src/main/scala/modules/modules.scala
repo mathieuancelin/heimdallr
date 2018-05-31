@@ -19,6 +19,7 @@ import io.heimdallr.models._
 import io.heimdallr.modules.{Extensions, _}
 import io.heimdallr.util.Implicits._
 import io.heimdallr.util.{IdGenerator, RegexPool, Startable, Stoppable}
+import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
@@ -558,6 +559,7 @@ class DefaultHeadersInTransformationModule extends HeadersInTransformationModule
       headers.filterNot(_.name() == authHeaderName) ++
       service.additionalHeaders.toList.map(t => RawHeader(t._1, t._2)) :+
       RawHeader("X-Request-Id", ctx.reqId) :+
+      RawHeader("X-Request-Timestamp", DateTime.now().toString("yyyy-MM-dd'T'HH:mm:ss.SSSZZ")) :+
       RawHeader("X-Fowarded-Host", host) :+
       RawHeader("X-Fowarded-Scheme", ctx.request.uri.scheme)
     ).asFuture

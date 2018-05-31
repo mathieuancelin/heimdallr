@@ -25,6 +25,7 @@ libraryDependencies ++= {
     "io.circe"               %% "circe-parser"       % circeVersion,
     "io.circe"               %% "circe-optics"       % circeVersion,
     "org.mortbay.jetty.alpn" % "jetty-alpn-agent"    % "2.0.7",
+    "joda-time"              % "joda-time"           % "2.10",
     "com.auth0"              % "java-jwt"            % "3.3.0",
     "com.github.gphat"       %% "censorinus"         % "2.1.15",
     "org.bouncycastle"       % "bcprov-jdk15on"      % bcVersion,
