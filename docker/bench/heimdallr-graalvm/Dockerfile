@@ -18,4 +18,4 @@ EXPOSE 8444
 EXPOSE 9082
 EXPOSE 9444
 
-CMD ["/heimdallr/graalvm/bin/java", "-jar", "heimdallr.jar", "--proxy.config.url=http://backend:8100/heimdallr2.json"]
+CMD ["/heimdallr/graalvm/bin/java", "-Dakka.http.server.pipelining-limit=1", "-Dakka.http.server.host-connection-pool.pipelining-limit=1", "-jar", "heimdallr.jar", "--proxy.config.url=http://backend:8100/heimdallr2.json"]
